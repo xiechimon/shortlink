@@ -1,7 +1,9 @@
 package com.xmon.shortlink.admin.controller;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.xmon.shortlink.admin.common.convention.result.Result;
 import com.xmon.shortlink.admin.common.convention.result.Results;
+import com.xmon.shortlink.admin.dto.resp.UserActualRespDTO;
 import com.xmon.shortlink.admin.dto.resp.UserRespDTO;
 import com.xmon.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -23,12 +25,14 @@ public class UserController {
      */
     @GetMapping("/api/shortlink/v1/user/{username}")
     public Result<UserRespDTO> getUserByUsername(@PathVariable String username) {
-        UserRespDTO result = userService.getUserByUsername(username);
+        return Results.success(userService.getUserByUsername(username));
+    }
 
-        if (result == null) {
-            return new Result<UserRespDTO>().setCode("1").setMessage("用户不存在");
-        } else {
-            return Results.success(result);
-        }
+    /**
+     * 根据用户名获取无脱敏用户信息
+     */
+    @GetMapping("/api/shortlink/v1/actual/user/{username}")
+    public Result<UserActualRespDTO> getActualUserByUsername(@PathVariable String username) {
+        return Results.success(BeanUtil.toBean(userService.getUserByUsername(username), UserActualRespDTO.class));
     }
 }
