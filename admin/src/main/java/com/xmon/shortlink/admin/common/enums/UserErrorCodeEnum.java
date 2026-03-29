@@ -7,10 +7,13 @@ import com.xmon.shortlink.admin.common.convention.errorcode.IErrorCode;
  */
 public enum UserErrorCodeEnum implements IErrorCode {
 
-    USER_NOT_FOUND("A000002", "用户不存在"),
-    USER_NAME_EXIST("A000003", "用户名已存在"),
-    USER_PASSWORD_INVALID("A000004", "用户名或密码错误"),
-    USER_DISABLED("A000005", "用户已被禁用");
+    USER_NULL("B000200", "用户记录不存在"),
+
+    USER_NAME_EXIST("B000201", "用户名已存在"),
+
+    USER_EXISTS("B000202", "用户记录已存在"),
+
+    USER_SAVE_ERROR("B000203", "用户记录新增失败");
 
     private final String code;
     private final String message;
