@@ -55,7 +55,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     public void register(UserRegisterReqDTO requestParam) {
         String username = requestParam.getUsername();
         if (!isUsernameAvailable(username)) {
-            throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST + username);
+            throw new ClientException("用户名" + username + "已存在", UserErrorCodeEnum.USER_NAME_EXIST);
         }
         RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY);
 
@@ -68,7 +68,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 userRegisterCachePenetrationBloomFilter.add(username);
                 return;
             }
-            throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
+            throw new ClientException("用户名" + username + "已存在", UserErrorCodeEnum.USER_NAME_EXIST);
         } finally {
             lock.unlock();
         }
