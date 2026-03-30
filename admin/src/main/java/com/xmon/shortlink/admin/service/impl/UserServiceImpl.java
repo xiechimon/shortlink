@@ -108,18 +108,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
 
         String token = UUID.randomUUID().toString();
-        String key = "login:" + token;
+        String key = "login:" + username + ":" + token;
         stringRedisTemplate.opsForValue().set(key, JSON.toJSONString(userDO), 30, TimeUnit.MINUTES);
         return new UserLoginRespDTO(token);
     }
 
     @Override
     public Boolean checkLogin(String username, String token) {
-        String userJson = stringRedisTemplate.opsForValue().get("login:" + token);
-        if (userJson == null) {
-            return false;
+        return stringRedisTemplate.hasKey("login:" + username + ":" + token);
+    }
+
+    @Override
+    public void logout(String username, String token) {
+        if (checkLogin(username, token)) {
+            stringRedisTemplate.delete("login:" + username + ":" + token);
+            return;
         }
-        UserDO user = JSON.parseObject(userJson, UserDO.class);
-        return user.getUsername().equals(username);
+
+        throw new ClientException("用户Token不存在或用户未登录");
     }
 }
