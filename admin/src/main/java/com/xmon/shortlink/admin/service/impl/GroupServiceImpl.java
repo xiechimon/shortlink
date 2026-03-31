@@ -24,11 +24,10 @@ public class GroupServiceImpl extends ServiceImpl<GroupMapper, GroupDO> implemen
             gid = RandomStringUtil.generate();
         } while (!hasGid(gid));
 
-
         GroupDO groupDO = GroupDO.builder()
                 .gid(gid)
-                .name(groupName)
                 .sortOrder(0)
+                .name(groupName)
                 .build();
         baseMapper.insert(groupDO);
     }
