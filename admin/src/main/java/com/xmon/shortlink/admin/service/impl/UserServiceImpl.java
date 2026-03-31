@@ -25,6 +25,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static com.xmon.shortlink.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
@@ -109,6 +110,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             throw new ClientException("用户不存在");
         }
 
+        // 检查是否已登录
+        String pattern = USER_LOGIN_KEY + username + ":*";
+        Set<String> existingKeys = stringRedisTemplate.keys(pattern);
+        if (existingKeys != null && !existingKeys.isEmpty()) {
+            // 已登录，返回已有 token
+            String existingKey = existingKeys.iterator().next();
+            String existingToken = existingKey.substring(existingKey.lastIndexOf(":") + 1);
+            // 刷新过期时间
+            stringRedisTemplate.expire(existingKey, USER_LOGIN_TIMEOUT, TimeUnit.MINUTES);
+            return new UserLoginRespDTO(existingToken);
+        }
+
+        // 首次登录，生成新 token
         String token = UUID.randomUUID().toString();
         String key = USER_LOGIN_KEY + username + ":" + token;
         stringRedisTemplate.opsForValue().set(key, JSON.toJSONString(userDO), USER_LOGIN_TIMEOUT, TimeUnit.MINUTES);
