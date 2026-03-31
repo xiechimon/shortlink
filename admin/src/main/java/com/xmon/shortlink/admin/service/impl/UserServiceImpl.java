@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import java.util.concurrent.TimeUnit;
 
 import static com.xmon.shortlink.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
+import static com.xmon.shortlink.admin.common.constant.RedisCacheConstant.USER_LOGIN_KEY;
 
 /**
  * 用户接口实现层
@@ -108,20 +109,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
 
         String token = UUID.randomUUID().toString();
-        String key = "login:" + username + ":" + token;
+        String key = USER_LOGIN_KEY + username + ":" + token;
         stringRedisTemplate.opsForValue().set(key, JSON.toJSONString(userDO), 30, TimeUnit.MINUTES);
         return new UserLoginRespDTO(token);
     }
 
     @Override
     public Boolean checkLogin(String username, String token) {
-        return stringRedisTemplate.hasKey("login:" + username + ":" + token);
+        return stringRedisTemplate.hasKey(USER_LOGIN_KEY + username + ":" + token);
     }
 
     @Override
     public void logout(String username, String token) {
         if (checkLogin(username, token)) {
-            stringRedisTemplate.delete("login:" + username + ":" + token);
+            stringRedisTemplate.delete(USER_LOGIN_KEY + username + ":" + token);
             return;
         }
 

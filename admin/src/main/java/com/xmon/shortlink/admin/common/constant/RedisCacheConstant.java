@@ -5,5 +5,13 @@ package com.xmon.shortlink.admin.common.constant;
  */
 public class RedisCacheConstant {
 
-    public static final String LOCK_USER_REGISTER_KEY = "shortlink:lock_user-register:";
+    /**
+     * 用户注册分布式锁
+     */
+    public static final String LOCK_USER_REGISTER_KEY = "rshortlink:lock_user-register:";
+
+    /**
+     * 用户登录缓存 Key 前缀，格式：login:{username}:{token}
+     */
+    public static final String USER_LOGIN_KEY = "login:";
 }
