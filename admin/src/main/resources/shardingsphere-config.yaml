@@ -30,6 +30,11 @@ rules:
         props:
           sharding-count: 16
 
+  # 单表规则（不分片的表）
+  - !SINGLE
+    tables:
+      - ds_0.t_group
+
   # 数据加密存储规则
   - !ENCRYPT
     # 需要加密的表集合
