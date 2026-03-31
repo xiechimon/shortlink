@@ -14,4 +14,9 @@ public class RedisCacheConstant {
      * 用户登录缓存 Key 前缀，格式：login:{username}:{token}
      */
     public static final String USER_LOGIN_KEY = "login:";
+
+    /**
+     * 用户登录缓存有效期（分钟）
+     */
+    public static final long USER_LOGIN_TIMEOUT = 3000000L;
 }

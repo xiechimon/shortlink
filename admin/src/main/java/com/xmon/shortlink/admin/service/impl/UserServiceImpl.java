@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.xmon.shortlink.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
 import static com.xmon.shortlink.admin.common.constant.RedisCacheConstant.USER_LOGIN_KEY;
+import static com.xmon.shortlink.admin.common.constant.RedisCacheConstant.USER_LOGIN_TIMEOUT;
 
 /**
  * 用户接口实现层
@@ -110,7 +111,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
         String token = UUID.randomUUID().toString();
         String key = USER_LOGIN_KEY + username + ":" + token;
-        stringRedisTemplate.opsForValue().set(key, JSON.toJSONString(userDO), 30, TimeUnit.MINUTES);
+        stringRedisTemplate.opsForValue().set(key, JSON.toJSONString(userDO), USER_LOGIN_TIMEOUT, TimeUnit.MINUTES);
         return new UserLoginRespDTO(token);
     }
 
