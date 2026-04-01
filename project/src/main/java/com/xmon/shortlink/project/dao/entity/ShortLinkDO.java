@@ -1,8 +1,6 @@
 package com.xmon.shortlink.project.dao.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.xmon.shortlink.project.common.database.BaseDO;
 import lombok.Data;
@@ -21,7 +19,7 @@ public class ShortLinkDO extends BaseDO {
     /**
      * ID
      */
-    @TableId(type = IdType.AUTO)
+    // @TableId(type = IdType.AUTO)
     private Long id;
 
     /**
