@@ -3,8 +3,7 @@ package com.xmon.shortlink.project.dao.entity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.xmon.shortlink.project.common.database.BaseDO;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.*;
 
 import java.util.Date;
 
@@ -12,8 +11,11 @@ import java.util.Date;
  * 短链接实体
  */
 @Data
-@EqualsAndHashCode(callSuper = true)
+@Builder
 @TableName("t_link")
+@NoArgsConstructor
+@AllArgsConstructor
+@EqualsAndHashCode(callSuper = true)
 public class ShortLinkDO extends BaseDO {
 
     /**
@@ -78,3 +80,4 @@ public class ShortLinkDO extends BaseDO {
     @TableField("`describe`")
     private String describe;
 }
+
