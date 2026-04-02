@@ -60,7 +60,7 @@ public class ShortLinkDO extends BaseDO {
     private Integer enableStatus;
 
     /**
-     * 创建类型 0: 控制台 1: 接口
+     * 创建类型 0: 接口 1: 控制台
      */
     private Integer createdType;
 
