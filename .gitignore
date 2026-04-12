@@ -31,7 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Test ###
 /admin/src/test/
+/gateway/src/test/
 
 ### Sensitive config ###
 **/application-prod.yaml
