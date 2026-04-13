@@ -67,21 +67,31 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     @Override
     public void register(UserRegisterReqDTO requestParam) {
         String username = requestParam.getUsername();
+
+        // 1. 先通过布隆过滤器判断用户名是否存在
         if (!isUsernameAvailable(username)) {
-            throw new ClientException("用户名" + username + "已存在", UserErrorCodeEnum.USER_NAME_EXIST);
+            throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
         }
-        RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY);
+        RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY + username);
+        // 2. 获取分布式锁，防止并发注册同一用户名
+        if (!lock.tryLock()) {
+            throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
+        }
 
         try {
-            if (lock.tryLock()) {
-                int inserted = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
-                if (inserted < 1) {
-                    throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
-                }
-                userRegisterCachePenetrationBloomFilter.add(username);
-                return;
+            // 3. 获取到锁后，再次检查用户名是否存在，防止并发注册同一用户名
+            if (!isUsernameAvailable(username)) {
+                throw new ClientException(UserErrorCodeEnum.USER_NAME_EXIST);
             }
-            throw new ClientException("用户名" + username + "已存在", UserErrorCodeEnum.USER_NAME_EXIST);
+
+            // 4. 插入数据库
+            int inserted = baseMapper.insert(BeanUtil.toBean(requestParam, UserDO.class));
+            if (inserted < 1) {
+                throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
+            }
+
+            // 5. 注册成功后，将用户名添加到布隆过滤器中，防止缓存穿透
+            userRegisterCachePenetrationBloomFilter.add(username);
         } finally {
             lock.unlock();
         }
