@@ -1,4 +1,4 @@
-package com.xmon.shortlink.project.dto.resp;
+package com.xmon.shortlink.admin.remote.dto.resp;
 
 import lombok.Data;
 
