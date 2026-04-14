@@ -1,4 +1,4 @@
-package com.xmon.shortlink.project.remote.dto.resp;
+package com.xmon.shortlink.project.dto.resp;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
