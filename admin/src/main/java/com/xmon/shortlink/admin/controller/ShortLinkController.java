@@ -3,7 +3,7 @@ package com.xmon.shortlink.admin.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.xmon.shortlink.admin.common.convention.result.Result;
 import com.xmon.shortlink.admin.common.convention.result.Results;
-import com.xmon.shortlink.admin.remote.dto.ShortLinkRemoteService;
+import com.xmon.shortlink.admin.remote.ShortLinkRemoteService;
 import com.xmon.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
 import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
