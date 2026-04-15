@@ -16,6 +16,7 @@ import com.xmon.shortlink.admin.dto.req.UserRegisterReqDTO;
 import com.xmon.shortlink.admin.dto.req.UserUpdateReqDTO;
 import com.xmon.shortlink.admin.dto.resp.UserLoginRespDTO;
 import com.xmon.shortlink.admin.dto.resp.UserRespDTO;
+import com.xmon.shortlink.admin.service.GroupService;
 import com.xmon.shortlink.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RBloomFilter;
@@ -24,6 +25,7 @@ import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -39,9 +41,12 @@ import static com.xmon.shortlink.admin.common.constant.RedisCacheConstant.USER_L
 @RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements UserService {
 
+    private static final String DEFAULT_GROUP_NAME = "默认分组";
+
     private final RBloomFilter<String> userRegisterCachePenetrationBloomFilter;
     private final RedissonClient redissonClient;
     private final StringRedisTemplate stringRedisTemplate;
+    private final GroupService groupService;
 
     @Override
     public UserRespDTO getUserByUsername(String username) {
@@ -65,6 +70,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void register(UserRegisterReqDTO requestParam) {
         String username = requestParam.getUsername();
 
@@ -90,7 +96,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 throw new ClientException(UserErrorCodeEnum.USER_SAVE_ERROR);
             }
 
-            // 5. 注册成功后，将用户名添加到布隆过滤器中，防止缓存穿透
+            // 5. 初始化默认分组，保证新用户注册后可直接创建短链接
+            groupService.saveGroup(username, DEFAULT_GROUP_NAME);
+
+            // 6. 注册成功后，将用户名添加到布隆过滤器中，防止缓存穿透
             userRegisterCachePenetrationBloomFilter.add(username);
         } finally {
             lock.unlock();
@@ -114,7 +123,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         // 检查是否已登录
         String pattern = USER_LOGIN_KEY + username + ":*";
         Set<String> existingKeys = stringRedisTemplate.keys(pattern);
-        if (existingKeys != null && !existingKeys.isEmpty()) {
+        if (!existingKeys.isEmpty()) {
             throw new ClientException("用户已登录");
         }
 
