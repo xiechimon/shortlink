@@ -1,12 +1,14 @@
 package com.xmon.shortlink.admin.remote;
 
 import cn.hutool.http.HttpUtil;
+import cn.hutool.http.HttpRequest;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.xmon.shortlink.admin.common.convention.result.Result;
 import com.xmon.shortlink.admin.remote.dto.req.ShortLinkCreateReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.ShortLinkPageReqDTO;
+import com.xmon.shortlink.admin.remote.dto.req.ShortLinkUpdateReqDTO;
 import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
 import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
@@ -26,6 +28,18 @@ public interface ShortLinkRemoteService {
      */
     default Result<ShortLinkCreateRespDTO> createShortLink(ShortLinkCreateReqDTO requestParam) {
         String resultBodyStr = HttpUtil.post(SHORT_LINK_SERVICE_BASE_URL + "/create", JSON.toJSONString(requestParam));
+        return JSON.parseObject(resultBodyStr, new TypeReference<>() {
+        });
+    }
+
+    /**
+     * 调用中台的短链接修改接口。
+     */
+    default Result<Void> updateShortLink(ShortLinkUpdateReqDTO requestParam) {
+        String resultBodyStr = HttpRequest.put(SHORT_LINK_SERVICE_BASE_URL + "/update")
+                .body(JSON.toJSONString(requestParam))
+                .execute()
+                .body();
         return JSON.parseObject(resultBodyStr, new TypeReference<>() {
         });
     }
