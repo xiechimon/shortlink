@@ -31,6 +31,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,17 +49,20 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
     private final RBloomFilter<String> shortLinkCachePenetrationBloomFilter;
     private final ShortLinkGotoMapper shortLinkGotoMapper;
+    @Value("${short-link.default-protocol:http}")
+    private String defaultProtocol;
 
     @Override
     public ShortLinkCreateRespDTO createShortLink(ShortLinkCreateReqDTO requestParam) {
+        String domain = normalizeDomain(requestParam.getDomain());
         String shortLinkSuffix = generateSuffix(requestParam);
         String fullShortUrl = StrBuilder
-                .create(requestParam.getDomain())
+                .create(domain)
                 .append("/")
                 .append(shortLinkSuffix)
                 .toString();
         ShortLinkDO shortLinkDO = ShortLinkDO.builder()
-                .domain(requestParam.getDomain())
+                .domain(domain)
                 .originUrl(requestParam.getOriginUrl())
                 .gid(requestParam.getGid())
                 .createdType(requestParam.getCreatedType())
@@ -83,7 +87,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         return ShortLinkCreateRespDTO.builder()
                 .gid(shortLinkDO.getGid())
                 .originUrl(shortLinkDO.getOriginUrl())
-                .fullShortUrl(shortLinkDO.getFullShortUrl())
+                .fullShortUrl(buildDisplayShortUrl(shortLinkDO.getFullShortUrl()))
                 .build();
     }
 
@@ -171,7 +175,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .orderByDesc(ShortLinkDO::getCreateTime);
 
         IPage<ShortLinkDO> resultPage = baseMapper.selectPage(requestParam, queryWrapper);
-        return resultPage.convert(each -> BeanUtil.toBean(each, ShortLinkPageRespDTO.class));
+        return resultPage.convert(each -> {
+            ShortLinkPageRespDTO result = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
+            result.setFullShortUrl(buildDisplayShortUrl(each.getFullShortUrl()));
+            return result;
+        });
     }
 
     @Override
@@ -212,6 +220,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .build();
     }
 
+    private String normalizeDomain(String domain) {
+        if (domain == null) {
+            return null;
+        }
+        return domain.replaceFirst("^https?://", "");
+    }
+
+    private String buildDisplayShortUrl(String fullShortUrl) {
+        return defaultProtocol + "://" + fullShortUrl;
+    }
+
     private boolean isExpired(ShortLinkDO shortLinkDO) {
         return Objects.equals(shortLinkDO.getValidDateType(), ValidDateTypeEnum.CUSTOM.getType())
                 && shortLinkDO.getValidDate() != null
@@ -221,6 +240,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private String generateSuffix(ShortLinkCreateReqDTO requestParam) {
         int customGenerateCount = 0;
         String shortUri;
+        String domain = normalizeDomain(requestParam.getDomain());
         while (true) {
             if (customGenerateCount > 10) {
                 throw new ServiceException(ProjectErrorCodeEnum.LINK_GENERATE_TOO_MANY);
@@ -228,7 +248,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             String originUrl = requestParam.getOriginUrl();
             originUrl += System.currentTimeMillis();
             shortUri = HashUtil.hashToBase62(originUrl);
-            String fullShortUrl = requestParam.getDomain() + "/" + shortUri;
+            String fullShortUrl = domain + "/" + shortUri;
             // 布隆过滤器中不存在，说明该短链接没有被使用过，可以直接使用；如果存在，则说明可能被使用过，需要继续生成新的短链接
             if (!shortLinkCachePenetrationBloomFilter.contains(fullShortUrl)) {
                 // 此时短链接一定未被使用
