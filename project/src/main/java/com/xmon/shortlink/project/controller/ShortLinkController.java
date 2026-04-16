@@ -10,8 +10,11 @@ import com.xmon.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.project.service.ShortLinkService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,6 +38,14 @@ public class ShortLinkController {
     @PostMapping("/api/shortlink/v1/create")
     public Result<ShortLinkCreateRespDTO> createShortLink(@RequestBody ShortLinkCreateReqDTO requestParam) {
         return Results.success(shortLinkService.createShortLink(requestParam));
+    }
+
+    /**
+     * 短链接跳转模板
+     */
+    @GetMapping("/{shortUri}")
+    public void restoreUrl(@PathVariable String shortUri, HttpServletRequest request, HttpServletResponse response) {
+        shortLinkService.restoreUrl(request.getServerName(), shortUri, request, response);
     }
 
     /**

@@ -9,6 +9,8 @@ import com.xmon.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.List;
 
@@ -24,6 +26,16 @@ public interface ShortLinkService extends IService<ShortLinkDO> {
      * @return 短链接创建信息
      */
     ShortLinkCreateRespDTO createShortLink(ShortLinkCreateReqDTO requestParam);
+
+    /**
+     * 短链接跳转模板
+     *
+     * @param domain 请求域名
+     * @param shortUri 短链接后缀
+     * @param request Http 请求
+     * @param response Http 响应
+     */
+    void restoreUrl(String domain, String shortUri, HttpServletRequest request, HttpServletResponse response);
 
     /**
      * 修改短链接

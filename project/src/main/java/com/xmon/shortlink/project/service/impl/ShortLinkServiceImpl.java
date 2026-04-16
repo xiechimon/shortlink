@@ -20,6 +20,8 @@ import com.xmon.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import com.xmon.shortlink.project.service.ShortLinkService;
 import com.xmon.shortlink.project.tookit.HashUtil;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -75,6 +78,22 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .originUrl(shortLinkDO.getOriginUrl())
                 .fullShortUrl(shortLinkDO.getFullShortUrl())
                 .build();
+    }
+
+    @Override
+    public void restoreUrl(String domain, String shortUri, HttpServletRequest request, HttpServletResponse response) {
+        String fullShortUrl = buildFullShortUrl(domain, shortUri);
+        LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                .eq(ShortLinkDO::getFullShortUrl, fullShortUrl)
+                .eq(ShortLinkDO::getDelFlag, 0)
+                .eq(ShortLinkDO::getEnableStatus, 0)
+                .last("LIMIT 1");
+        ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper);
+        if (shortLinkDO == null || isExpired(shortLinkDO)) {
+            sendNotFound(response);
+            return;
+        }
+        sendRedirect(response, shortLinkDO.getOriginUrl());
     }
 
     @Override
@@ -167,6 +186,32 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .validDate(Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()) ? null : requestParam.getValidDate())
                 .describe(requestParam.getDescribe())
                 .build();
+    }
+
+    private String buildFullShortUrl(String domain, String shortUri) {
+        return domain + "/" + shortUri;
+    }
+
+    private boolean isExpired(ShortLinkDO shortLinkDO) {
+        return Objects.equals(shortLinkDO.getValidDateType(), ValidDateTypeEnum.CUSTOM.getType())
+                && shortLinkDO.getValidDate() != null
+                && shortLinkDO.getValidDate().before(new java.util.Date());
+    }
+
+    private void sendRedirect(HttpServletResponse response, String originUrl) {
+        try {
+            response.sendRedirect(originUrl);
+        } catch (IOException ex) {
+            throw new ServiceException("短链接跳转失败");
+        }
+    }
+
+    private void sendNotFound(HttpServletResponse response) {
+        try {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND);
+        } catch (IOException ex) {
+            throw new ServiceException(ProjectErrorCodeEnum.LINK_NOT_FOUND);
+        }
     }
 
     private String generateSuffix(ShortLinkCreateReqDTO requestParam) {
