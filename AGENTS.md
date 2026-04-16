@@ -1,51 +1,47 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+## 项目结构与模块划分
 
-This is a Java 21 Spring Boot multi-module Maven project.
+本仓库是 Java 21 + Spring Boot 的多模块 Maven 项目：
 
-- `admin/`: management APIs, user/group administration, and remote calls into short-link services.
-- `project/`: core short-link APIs, persistence logic, sharding-aware link operations, and DTOs.
-- `gateway/`: gateway module for request routing and cross-cutting entry concerns.
-- Source code lives under `*/src/main/java`; configuration lives under `*/src/main/resources`.
-- Tests belong under `*/src/test/java`, mirroring the package structure of production code.
-- Root `pom.xml` manages shared versions and modules; each module has its own `pom.xml`.
+- `admin/`：管理后台，负责用户、分组、短链接管理与远程调用。
+- `project/`：核心短链接服务，包含创建、更新、跳转、统计及分片相关逻辑。
+- `gateway/`：网关入口与统一流量转发。
+- 源码位于 `*/src/main/java`，配置位于 `*/src/main/resources`，测试位于 `*/src/test/java`。
 
-## Build, Test, and Development Commands
+## 构建、测试与运行
 
-- `./mvnw clean compile`: compile all modules.
-- `./mvnw test`: run all module tests.
-- `./mvnw -pl project test`: run tests for one module.
-- `./mvnw -pl admin -am compile`: compile `admin` and required upstream modules.
-- `./mvnw -pl project spring-boot:run`: run the core short-link service locally.
-- `./mvnw -pl admin spring-boot:run`: run the admin service locally.
+- `./mvnw clean compile`：编译全部模块。
+- `./mvnw test`：运行全部测试。
+- `./mvnw -pl project test`：仅测试 `project` 模块。
+- `./mvnw -pl admin -am compile`：编译 `admin` 及其依赖模块。
+- `./mvnw -pl project spring-boot:run`：本地启动核心短链接服务。
+- `./mvnw -pl admin spring-boot:run`：本地启动后台服务。
 
-Use `-DskipTests` only for quick local compilation checks, not before final verification.
+提交前至少运行受影响模块的测试；`-DskipTests` 只用于临时编译检查。
 
-## Coding Style & Naming Conventions
+## 编码规范
 
-- Use 4-space indentation and standard Java naming: `UpperCamelCase` classes, `lowerCamelCase` methods/fields.
-- Keep controllers thin; put business logic in `service/impl`.
-- DTOs belong in `dto/req`, `dto/resp`, or `remote/dto`.
-- Prefer constructor injection with Lombok `@RequiredArgsConstructor` and `final` dependencies.
-- Use project enums for business constants instead of magic numbers, for example valid-date types and error codes.
-- For sharded tables, do not update sharding keys directly; use insert-plus-logical-delete migration patterns.
+- 缩进 4 个空格，类名使用 `UpperCamelCase`，方法/字段使用 `lowerCamelCase`。
+- 控制层保持轻量，业务逻辑放在 `service/impl`。
+- 命名约定：`UserDO`、`UserReqDTO`、`UserRespDTO`。
+- 依赖注入统一使用 `@RequiredArgsConstructor` + `final`。
+- 优先使用枚举和错误码，避免魔法值；分片表禁止直接更新分片键，改用“插入新记录 + 逻辑删除旧记录”。
 
-## Testing Guidelines
+## 错误码与异常
 
-- Add tests under the matching module’s `src/test/java`.
-- Name unit tests with clear behavior, e.g. `ShortLinkServiceImplTest`.
-- Prefer focused service-level tests for business rules and controller tests for request/response wiring.
-- Run at least the affected module tests before committing: `./mvnw -pl project test` or `./mvnw -pl admin test`.
+- 错误码前缀：`A` 客户端错误，`B` 服务端错误，`C` 远程调用错误。
+- `BaseErrorCode` 定义通用校验类错误，`XxxErrorCodeEnum` 定义模块业务错误。
+- 异常体系：`ClientException`、`ServiceException`、`RemoteException`，统一由 `GlobalExceptionHandler` 处理。
 
-## Commit & Pull Request Guidelines
+## 测试要求
 
-- Follow Conventional Commits as used in history: `feat(admin): ...`, `fix(dto): ...`, `feat(shortlink): ...`.
-- Keep commits focused on one logical change.
-- PRs should include a concise summary, affected modules, test results, and any API request/response changes.
-- Mention sharding, Redis, or database migration implications when relevant.
+- 测试类放在对应模块的 `src/test/java` 下，命名如 `ShortLinkServiceImplTest`。
+- 优先覆盖 service 层业务分支，其次补 controller 层请求/响应测试。
+- 涉及分库分表、Redis、唯一索引或更新迁移逻辑时，需重点验证边界场景。
 
-## Security & Configuration Tips
+## 提交与合并请求
 
-- Do not commit real credentials. Use Maven profiles and environment variables for production secrets.
-- Treat Redis, database, and sharding configuration changes as high-impact; document local verification steps.
+- 遵循 Conventional Commits：如 `feat(admin): ...`、`fix(dto): ...`、`feat(shortlink): ...`。
+- 每次提交保持单一主题，避免混入无关改动。
+- PR 应说明影响模块、测试结果、接口或数据库变更；涉及分片、缓存、索引时需明确说明风险。
