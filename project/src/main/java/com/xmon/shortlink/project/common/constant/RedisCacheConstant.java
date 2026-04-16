@@ -39,12 +39,6 @@ public final class RedisCacheConstant {
     public static final long GOTO_LINK_NULL_TTL_SECONDS = 30L;
 
     /**
-     * 默认短链接缓存有效期（天）
-     * 当链接为永久有效或未配置精确过期时间时，采用默认缓存时长。
-     */
-    public static final long GOTO_LINK_DEFAULT_TTL_DAYS = 1L;
-
-    /**
      * 构建短链接跳转缓存 key，统一 key 生成逻辑，避免业务层散落 String.format。
      */
     public static String buildGotoShortLinkKey(String fullShortUrl) {

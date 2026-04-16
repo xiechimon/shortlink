@@ -3,15 +3,15 @@ package com.xmon.shortlink.project.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.text.StrBuilder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xmon.shortlink.project.common.constant.RedisCacheConstant;
+import com.xmon.shortlink.project.common.convention.errorcode.ProjectErrorCodeEnum;
 import com.xmon.shortlink.project.common.convention.exception.ClientException;
 import com.xmon.shortlink.project.common.convention.exception.ServiceException;
-import com.xmon.shortlink.project.common.convention.errorcode.ProjectErrorCodeEnum;
 import com.xmon.shortlink.project.common.enums.ValidDateTypeEnum;
 import com.xmon.shortlink.project.dao.entity.ShortLinkDO;
 import com.xmon.shortlink.project.dao.entity.ShortLinkGotoDO;
@@ -23,28 +23,24 @@ import com.xmon.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import com.xmon.shortlink.project.service.ShortLinkService;
 import com.xmon.shortlink.project.tookit.HashUtil;
+import com.xmon.shortlink.project.tookit.ShortLinkCacheUtil;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -94,6 +90,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         }
 
         shortLinkCachePenetrationBloomFilter.add(shortLinkDO.getFullShortUrl());
+        warmupShortLinkCache(shortLinkDO);
         return ShortLinkCreateRespDTO.builder()
                 .gid(shortLinkDO.getGid())
                 .originUrl(shortLinkDO.getOriginUrl())
@@ -113,7 +110,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         response.sendError(HttpServletResponse.SC_NOT_FOUND);
     }
 
-    private boolean tryRestoreByFullShortUrl(String fullShortUrl, HttpServletResponse response) throws IOException, InterruptedException {
+    private boolean tryRestoreByFullShortUrl(String fullShortUrl, HttpServletResponse response) {
         String cacheKey = RedisCacheConstant.buildGotoShortLinkKey(fullShortUrl);
         String nullCacheKey = RedisCacheConstant.buildGotoIsNullShortLinkKey(fullShortUrl);
         if (stringRedisTemplate.hasKey(nullCacheKey)) {
@@ -134,9 +131,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         // 缓存未命中但布隆可能存在，进入互斥重建，避免并发击穿。
         RLock lock = redissonClient.getLock(RedisCacheConstant.buildGotoShortLinkLockKey(fullShortUrl));
         if (!lock.tryLock()) {
-            TimeUnit.MILLISECONDS.sleep(50);
+            // 未抢到锁，短暂等待后再查一次缓存；若仍未命中则兜底走 DB 路径
+            try {
+                TimeUnit.MILLISECONDS.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             String retriedOriginUrl = stringRedisTemplate.opsForValue().get(cacheKey);
-            return tryRespondFromCache(retriedOriginUrl, response);
+            if (tryRespondFromCache(retriedOriginUrl, response)) {
+                return true;
+            }
+            // 缓存仍未就绪，降级：直接查 DB（不加锁，接受少量并发回源）
         }
 
         try {
@@ -162,7 +167,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .eq(ShortLinkDO::getEnableStatus, 0)
                     .last("LIMIT 1");
             ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper);
-            if (shortLinkDO == null || isExpired(shortLinkDO)) {
+            if (shortLinkDO == null || ShortLinkCacheUtil.isExpired(shortLinkDO)) {
                 // 主表不存在或已过期，写空值缓存，保证后续快速失败。
                 cacheNullShortLink(fullShortUrl);
                 return false;
@@ -170,10 +175,12 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
             // 回源成功后写回缓存，后续请求走 Redis。
             cacheShortLink(cacheKey, shortLinkDO);
-            response.sendRedirect(shortLinkDO.getOriginUrl());
+            sendRedirect(response, shortLinkDO.getOriginUrl());
             return true;
         } finally {
-            lock.unlock();
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
 
@@ -202,6 +209,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     .set(Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()), ShortLinkDO::getValidDate, null);
             baseMapper.update(shortLinkDO, updateWrapper);
             evictShortLinkCache(hasShortLinkDO.getFullShortUrl());
+            warmupShortLinkCache(buildUpdatedShortLinkDO(hasShortLinkDO, requestParam));
             return;
         }
 
@@ -225,6 +233,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .eq(ShortLinkDO::getDelFlag, 0);
         baseMapper.update(deleteShortLinkDO, deleteWrapper);
         evictShortLinkCache(hasShortLinkDO.getFullShortUrl());
+        warmupShortLinkCache(shortLinkDO);
     }
 
     @Override
@@ -281,6 +290,24 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .build();
     }
 
+    private ShortLinkDO buildUpdatedShortLinkDO(ShortLinkDO hasShortLinkDO, ShortLinkUpdateReqDTO requestParam) {
+        return ShortLinkDO.builder()
+                .id(hasShortLinkDO.getId())
+                .domain(hasShortLinkDO.getDomain())
+                .shortUri(hasShortLinkDO.getShortUri())
+                .fullShortUrl(hasShortLinkDO.getFullShortUrl())
+                .originUrl(requestParam.getOriginUrl())
+                .clickNum(hasShortLinkDO.getClickNum())
+                .gid(hasShortLinkDO.getGid())
+                .favicon(hasShortLinkDO.getFavicon())
+                .enableStatus(hasShortLinkDO.getEnableStatus())
+                .createdType(hasShortLinkDO.getCreatedType())
+                .validDateType(requestParam.getValidDateType())
+                .validDate(Objects.equals(requestParam.getValidDateType(), ValidDateTypeEnum.PERMANENT.getType()) ? null : requestParam.getValidDate())
+                .describe(requestParam.getDescribe())
+                .build();
+    }
+
     private String normalizeDomain(String domain) {
         if (domain == null) {
             return null;
@@ -292,21 +319,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         return defaultProtocol + "://" + fullShortUrl;
     }
 
-    private boolean isExpired(ShortLinkDO shortLinkDO) {
-        return Objects.equals(shortLinkDO.getValidDateType(), ValidDateTypeEnum.CUSTOM.getType())
-                && shortLinkDO.getValidDate() != null
-                && shortLinkDO.getValidDate().before(new java.util.Date());
-    }
-
     private void cacheNullShortLink(String fullShortUrl) {
-        String cacheKey = RedisCacheConstant.buildGotoShortLinkKey(fullShortUrl);
         String nullCacheKey = RedisCacheConstant.buildGotoIsNullShortLinkKey(fullShortUrl);
-        stringRedisTemplate.opsForValue().set(
-                cacheKey,
-                RedisCacheConstant.GOTO_LINK_NULL_VALUE,
-                RedisCacheConstant.GOTO_LINK_NULL_TTL_SECONDS,
-                TimeUnit.SECONDS
-        );
         stringRedisTemplate.opsForValue().set(
                 nullCacheKey,
                 "1",
@@ -318,22 +332,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private void cacheShortLink(String cacheKey, ShortLinkDO shortLinkDO) {
         String nullCacheKey = RedisCacheConstant.buildGotoIsNullShortLinkKey(shortLinkDO.getFullShortUrl());
         stringRedisTemplate.delete(nullCacheKey);
-        // 自定义有效期链接：缓存 TTL 对齐链接过期时间，避免缓存存活超过业务有效期。
-        if (Objects.equals(shortLinkDO.getValidDateType(), ValidDateTypeEnum.CUSTOM.getType())
-                && shortLinkDO.getValidDate() != null) {
-            long ttlMillis = shortLinkDO.getValidDate().getTime() - System.currentTimeMillis();
-            if (ttlMillis > 0) {
-                stringRedisTemplate.opsForValue().set(cacheKey, shortLinkDO.getOriginUrl(), ttlMillis, TimeUnit.MILLISECONDS);
-                return;
-            }
+        long ttlMillis = ShortLinkCacheUtil.getLinkCacheValidTime(shortLinkDO.getValidDate());
+        if (ttlMillis > 0) {
+            stringRedisTemplate.opsForValue().set(cacheKey, shortLinkDO.getOriginUrl(), ttlMillis, TimeUnit.MILLISECONDS);
         }
-        // 永久有效或无可用过期时间时，使用默认缓存时长。
-        stringRedisTemplate.opsForValue().set(
-                cacheKey,
-                shortLinkDO.getOriginUrl(),
-                RedisCacheConstant.GOTO_LINK_DEFAULT_TTL_DAYS,
-                TimeUnit.DAYS
-        );
     }
 
     private void evictShortLinkCache(String fullShortUrl) {
@@ -341,15 +343,25 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         stringRedisTemplate.delete(RedisCacheConstant.buildGotoIsNullShortLinkKey(fullShortUrl));
     }
 
-    private boolean tryRespondFromCache(String cachedOriginUrl, HttpServletResponse response) throws IOException {
-        if (Objects.equals(cachedOriginUrl, RedisCacheConstant.GOTO_LINK_NULL_VALUE)) {
-            return false;
+    private void warmupShortLinkCache(ShortLinkDO shortLinkDO) {
+        if (shortLinkDO == null || shortLinkDO.getFullShortUrl() == null || ShortLinkCacheUtil.isExpired(shortLinkDO)) {
+            return;
         }
+        cacheShortLink(RedisCacheConstant.buildGotoShortLinkKey(shortLinkDO.getFullShortUrl()), shortLinkDO);
+    }
+
+    @SneakyThrows
+    private boolean tryRespondFromCache(String cachedOriginUrl, HttpServletResponse response) {
         if (cachedOriginUrl != null && !cachedOriginUrl.isBlank()) {
-            response.sendRedirect(cachedOriginUrl);
+            sendRedirect(response, cachedOriginUrl);
             return true;
         }
         return false;
+    }
+
+    @SneakyThrows
+    private void sendRedirect(HttpServletResponse response, String originUrl) {
+        response.sendRedirect(originUrl);
     }
 
     private Set<String> buildCandidateFullShortUrls(String domain, String shortUri) {
