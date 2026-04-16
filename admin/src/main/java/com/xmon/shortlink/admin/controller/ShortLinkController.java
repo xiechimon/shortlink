@@ -33,6 +33,7 @@ public class ShortLinkController {
      */
     @PostMapping("/api/shortlink/admin/v1/create")
     public Result<ShortLinkCreateRespDTO> createShortLink(@RequestBody ShortLinkCreateReqDTO requestParam) {
+        requestParam.setDomain(normalizeUrlPrefix(requestParam.getDomain()));
         return shortLinkRemoteService.createShortLink(requestParam);
     }
 
@@ -41,6 +42,7 @@ public class ShortLinkController {
      */
     @PutMapping("/api/shortlink/admin/v1/update")
     public Result<Void> updateShortLink(@RequestBody ShortLinkUpdateReqDTO requestParam) {
+        requestParam.setFullShortUrl(normalizeUrlPrefix(requestParam.getFullShortUrl()));
         return shortLinkRemoteService.updateShortLink(requestParam);
     }
 
@@ -50,6 +52,13 @@ public class ShortLinkController {
     @GetMapping("/api/shortlink/admin/v1/page")
     public Result<IPage<ShortLinkPageRespDTO>> pageShortLink(ShortLinkPageReqDTO requestParam) {
         return Results.success(shortLinkRemoteService.pageShortLink(requestParam).getData());
+    }
+
+    private String normalizeUrlPrefix(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.replaceFirst("^https?://", "");
     }
 
 }
