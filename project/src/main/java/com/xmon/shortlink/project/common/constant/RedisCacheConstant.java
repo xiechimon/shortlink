@@ -21,6 +21,12 @@ public final class RedisCacheConstant {
     public static final String GOTO_SHORT_LINK_LOCK_KEY = "short-link:goto:lock:%s";
 
     /**
+     * 短链接空值标记 Key 模板
+     * 用于标记不存在的短链接，防止缓存穿透反复回源。
+     */
+    public static final String GOTO_IS_NULL_SHORT_LINK_KEY = "short-link:goto:is-null:%s";
+
+    /**
      * 短链接不存在的占位值
      * 用于缓存穿透保护：命中该值直接返回 404，不再回源数据库。
      */
@@ -50,5 +56,12 @@ public final class RedisCacheConstant {
      */
     public static String buildGotoShortLinkLockKey(String fullShortUrl) {
         return String.format(GOTO_SHORT_LINK_LOCK_KEY, fullShortUrl);
+    }
+
+    /**
+     * 构建短链接空值标记 key。
+     */
+    public static String buildGotoIsNullShortLinkKey(String fullShortUrl) {
+        return String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl);
     }
 }

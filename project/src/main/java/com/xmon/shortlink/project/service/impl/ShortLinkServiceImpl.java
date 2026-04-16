@@ -115,6 +115,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
     private boolean tryRestoreByFullShortUrl(String fullShortUrl, HttpServletResponse response) throws IOException, InterruptedException {
         String cacheKey = RedisCacheConstant.buildGotoShortLinkKey(fullShortUrl);
+        String nullCacheKey = RedisCacheConstant.buildGotoIsNullShortLinkKey(fullShortUrl);
+        if (stringRedisTemplate.hasKey(nullCacheKey)) {
+            return false;
+        }
         // 一级：先查 Redis 热缓存，命中则直接返回，避免访问数据库。
         String cachedOriginUrl = stringRedisTemplate.opsForValue().get(cacheKey);
         if (tryRespondFromCache(cachedOriginUrl, response)) {
@@ -123,7 +127,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         if (!shortLinkCachePenetrationBloomFilter.contains(fullShortUrl)) {
             // 布隆判定不存在，写入短期空值缓存，拦截后续同类穿透请求。
-            cacheNullShortLink(cacheKey);
+            cacheNullShortLink(fullShortUrl);
             return false;
         }
 
@@ -132,10 +136,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         if (!lock.tryLock()) {
             TimeUnit.MILLISECONDS.sleep(50);
             String retriedOriginUrl = stringRedisTemplate.opsForValue().get(cacheKey);
-            if (tryRespondFromCache(retriedOriginUrl, response)) {
-                return true;
-            }
-            return false;
+            return tryRespondFromCache(retriedOriginUrl, response);
         }
 
         try {
@@ -150,7 +151,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(gotoQueryWrapper);
             if (shortLinkGotoDO == null) {
                 // 跳转映射不存在，回填空值缓存，减少无效回源。
-                cacheNullShortLink(cacheKey);
+                cacheNullShortLink(fullShortUrl);
                 return false;
             }
 
@@ -163,7 +164,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             ShortLinkDO shortLinkDO = baseMapper.selectOne(queryWrapper);
             if (shortLinkDO == null || isExpired(shortLinkDO)) {
                 // 主表不存在或已过期，写空值缓存，保证后续快速失败。
-                cacheNullShortLink(cacheKey);
+                cacheNullShortLink(fullShortUrl);
                 return false;
             }
 
@@ -297,16 +298,26 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 && shortLinkDO.getValidDate().before(new java.util.Date());
     }
 
-    private void cacheNullShortLink(String cacheKey) {
+    private void cacheNullShortLink(String fullShortUrl) {
+        String cacheKey = RedisCacheConstant.buildGotoShortLinkKey(fullShortUrl);
+        String nullCacheKey = RedisCacheConstant.buildGotoIsNullShortLinkKey(fullShortUrl);
         stringRedisTemplate.opsForValue().set(
                 cacheKey,
                 RedisCacheConstant.GOTO_LINK_NULL_VALUE,
                 RedisCacheConstant.GOTO_LINK_NULL_TTL_SECONDS,
                 TimeUnit.SECONDS
         );
+        stringRedisTemplate.opsForValue().set(
+                nullCacheKey,
+                "1",
+                RedisCacheConstant.GOTO_LINK_NULL_TTL_SECONDS,
+                TimeUnit.SECONDS
+        );
     }
 
     private void cacheShortLink(String cacheKey, ShortLinkDO shortLinkDO) {
+        String nullCacheKey = RedisCacheConstant.buildGotoIsNullShortLinkKey(shortLinkDO.getFullShortUrl());
+        stringRedisTemplate.delete(nullCacheKey);
         // 自定义有效期链接：缓存 TTL 对齐链接过期时间，避免缓存存活超过业务有效期。
         if (Objects.equals(shortLinkDO.getValidDateType(), ValidDateTypeEnum.CUSTOM.getType())
                 && shortLinkDO.getValidDate() != null) {
@@ -327,6 +338,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
     private void evictShortLinkCache(String fullShortUrl) {
         stringRedisTemplate.delete(RedisCacheConstant.buildGotoShortLinkKey(fullShortUrl));
+        stringRedisTemplate.delete(RedisCacheConstant.buildGotoIsNullShortLinkKey(fullShortUrl));
     }
 
     private boolean tryRespondFromCache(String cachedOriginUrl, HttpServletResponse response) throws IOException {
