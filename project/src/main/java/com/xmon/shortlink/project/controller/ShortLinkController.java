@@ -45,7 +45,11 @@ public class ShortLinkController {
      */
     @GetMapping("/{shortUri}")
     public void restoreUrl(@PathVariable String shortUri, HttpServletRequest request, HttpServletResponse response) {
-        shortLinkService.restoreUrl(request.getServerName(), shortUri, request, response);
+        String domain = request.getHeader("Host");
+        if (domain == null || domain.isBlank()) {
+            domain = request.getServerName();
+        }
+        shortLinkService.restoreUrl(domain, shortUri, request, response);
     }
 
     /**
