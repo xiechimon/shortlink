@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -61,4 +62,11 @@ public class ShortLinkController {
         return value.replaceFirst("^https?://", "");
     }
 
+    /**
+     * 根据 URL 获取目标网站的标题
+     */
+    @GetMapping("/api/shortlink/admin/v1/title")
+    public Result<String> getTitleByUrl(@RequestParam("url") String url) {
+        return shortLinkRemoteService.getTitleByUrl(url);
+    }
 }

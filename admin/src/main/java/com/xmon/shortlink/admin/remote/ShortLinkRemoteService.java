@@ -64,9 +64,21 @@ public interface ShortLinkRemoteService {
     default Result<List<ShortLinkGroupCountQueryRespDTO>> listGroupShortLinkCount(List<String> requestParam) {
         HashMap<String, Object> requestMap = new HashMap<>();
         requestMap.put("requestParam", requestParam);
-         String resultPageStr = HttpUtil.get(SHORT_LINK_SERVICE_BASE_URL + "/count", requestMap);
+        String resultPageStr = HttpUtil.get(SHORT_LINK_SERVICE_BASE_URL + "/count", requestMap);
 
         return JSON.parseObject(resultPageStr, new TypeReference<>() {
+        });
+    }
+
+    /**
+     * 根据 URL 获取目标网站的标题
+     */
+    default Result<String> getTitleByUrl(String url) {
+        HashMap<String, Object> requestMap = new HashMap<>();
+        requestMap.put("url", url);
+        String resultStr = HttpUtil.get(SHORT_LINK_SERVICE_BASE_URL + "/title", requestMap);
+
+        return JSON.parseObject(resultStr, new TypeReference<>() {
         });
     }
 }
