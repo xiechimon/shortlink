@@ -101,4 +101,18 @@ public interface ShortLinkRemoteService {
     default void saveRecycleBin(RecycleBinSaveReqDTO requestParam) {
         HttpUtil.post(SHORT_LINK_SERVICE_BASE_URL + "/recycle-bin/save", JSON.toJSONString(requestParam));
     }
+
+    /**
+     * 分页查询回收站短链接
+     */
+    default Result<IPage<ShortLinkPageRespDTO>> pageRecycleBin(ShortLinkPageReqDTO requestParam) {
+        HashMap<String, Object> requestMap = new HashMap<>();
+        requestMap.put("gid", requestParam.getGid());
+        requestMap.put("current", requestParam.getCurrent());
+        requestMap.put("size", requestParam.getSize());
+        String resultPageStr = HttpUtil.get(SHORT_LINK_SERVICE_BASE_URL + "/recycle-bin/page", requestMap);
+
+        return JSON.parseObject(resultPageStr, new TypeReference<>() {
+        });
+    }
 }

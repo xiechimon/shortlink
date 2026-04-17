@@ -1,11 +1,16 @@
 package com.xmon.shortlink.project.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xmon.shortlink.project.common.constant.RedisCacheConstant;
 import com.xmon.shortlink.project.dao.entity.ShortLinkDO;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.xmon.shortlink.project.dto.req.RecycleBinSaveReqDTO;
+import com.xmon.shortlink.project.dto.req.ShortLinkPageReqDTO;
+import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.project.service.RecycleBinService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -37,5 +42,22 @@ public class RecycleBinServiceImpl implements RecycleBinService {
 
         // 删除已有缓存，拦截后续跳转，使其触发读库并遇到 enableStatus=1
         stringRedisTemplate.delete(RedisCacheConstant.buildGotoShortLinkKey(requestParam.getFullShortUrl()));
+    }
+
+    @Override
+    public IPage<ShortLinkPageRespDTO> pageRecycleBin(ShortLinkPageReqDTO requestParam) {
+        LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                .eq(ShortLinkDO::getGid, requestParam.getGid())
+                .eq(ShortLinkDO::getEnableStatus, 1)
+                .eq(ShortLinkDO::getDelFlag, 0)
+                .orderByDesc(ShortLinkDO::getUpdateTime);
+
+        IPage<ShortLinkDO> resultPage = shortLinkMapper.selectPage(requestParam, queryWrapper);
+        return resultPage.convert(each -> {
+            ShortLinkPageRespDTO result = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
+            // 这里简单拼接 http 前缀用于展示
+            result.setFullShortUrl("http://" + each.getFullShortUrl());
+            return result;
+        });
     }
 }
