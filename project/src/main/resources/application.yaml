@@ -14,3 +14,5 @@ spring:
 
 short-link:
   default-protocol: http
+  # 短链接不存在时的跳转页面，为空则默认返回404错误
+  not-found-redirect-url: /404.html

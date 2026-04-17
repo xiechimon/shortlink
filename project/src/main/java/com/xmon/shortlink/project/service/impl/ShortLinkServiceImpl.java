@@ -57,6 +57,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final RedissonClient redissonClient;
     @Value("${short-link.default-protocol:http}")
     private String defaultProtocol;
+    @Value("${short-link.not-found-redirect-url:}")
+    private String notFoundRedirectUrl;
 
     @Override
     public ShortLinkCreateRespDTO createShortLink(ShortLinkCreateReqDTO requestParam) {
@@ -106,6 +108,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             if (tryRestoreByFullShortUrl(fullShortUrl, response)) {
                 return;
             }
+        }
+        if (notFoundRedirectUrl != null && !notFoundRedirectUrl.isBlank()) {
+            response.sendRedirect(notFoundRedirectUrl);
+            return;
         }
         response.sendError(HttpServletResponse.SC_NOT_FOUND);
     }

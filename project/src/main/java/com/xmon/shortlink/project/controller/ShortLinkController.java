@@ -43,7 +43,7 @@ public class ShortLinkController {
     /**
      * 短链接跳转模板
      */
-    @GetMapping("/{shortUri}")
+    @GetMapping("/{shortUri:[a-zA-Z0-9]+}")
     public void restoreUrl(@PathVariable String shortUri, HttpServletRequest request, HttpServletResponse response) {
         String domain = request.getHeader("Host");
         if (domain == null || domain.isBlank()) {
