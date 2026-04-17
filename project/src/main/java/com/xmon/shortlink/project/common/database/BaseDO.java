@@ -25,6 +25,8 @@ public class BaseDO {
 
     /**
      * 删除标识 0：未删除 1：已删除
+     * TODO: 最佳实践：建议后续在此处补充 @TableLogic 注解，配合全局逻辑删除配置，
+     * 以便实现所有 SELECT/UPDATE/DELETE 操作自动化带上 AND del_flag=0，消灭大量硬编码。
      */
     @TableField(fill = FieldFill.INSERT)
     private Integer delFlag;

@@ -41,7 +41,7 @@ public final class RedisCacheConstant {
     /**
      * 构建短链接跳转缓存 key，统一 key 生成逻辑，避免业务层散落 String.format。
      */
-    public static String buildGotoShortLinkKey(String fullShortUrl) {
+    public static String  buildGotoShortLinkKey(String fullShortUrl) {
         return String.format(GOTO_SHORT_LINK_KEY, fullShortUrl);
     }
 
