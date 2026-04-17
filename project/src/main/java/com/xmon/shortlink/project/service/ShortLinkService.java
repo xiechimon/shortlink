@@ -57,4 +57,12 @@ public interface ShortLinkService extends IService<ShortLinkDO> {
      * @return 查询短链接内分组数量相应
      */
     List<ShortLinkGroupCountQueryRespDTO> listGroupShortLinkCount(List<String> requestParam);
+
+    /**
+     * 获取目标网站的网页标题
+     *
+     * @param url 目标链接
+     * @return 网页标题；若无法获取则返回 null
+     */
+    String getTitleByUrl(String url);
 }

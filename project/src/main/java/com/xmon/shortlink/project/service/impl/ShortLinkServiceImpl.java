@@ -26,6 +26,7 @@ import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.project.service.ShortLinkService;
 import com.xmon.shortlink.project.tookit.HashUtil;
 import com.xmon.shortlink.project.tookit.ShortLinkCacheUtil;
+import com.xmon.shortlink.project.tookit.WebTitleFetcher;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +56,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final ShortLinkGotoMapper shortLinkGotoMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final RedissonClient redissonClient;
+    private final WebTitleFetcher webTitleFetcher;
     @Value("${short-link.default-protocol:http}")
     private String defaultProtocol;
     @Value("${short-link.not-found-redirect-url:}")
@@ -268,6 +270,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 .groupBy("gid");
         List<Map<String, Object>> shortLinkDOList = baseMapper.selectMaps(queryWrapper);
         return BeanUtil.copyToList(shortLinkDOList, ShortLinkGroupCountQueryRespDTO.class);
+    }
+
+    @Override
+    public String getTitleByUrl(String url) {
+        return webTitleFetcher.fetchTitle(url);
     }
 
     private ShortLinkDO buildSameGroupUpdateDO(ShortLinkUpdateReqDTO requestParam) {
