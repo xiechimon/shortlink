@@ -65,4 +65,12 @@ public interface ShortLinkService extends IService<ShortLinkDO> {
      * @return 网页标题；若无法获取则返回 null
      */
     String getTitleByUrl(String url);
+
+    /**
+     * 获取目标网站的网页图标
+     *
+     * @param url 目标链接
+     * @return 网页图标绝对地址；若无法获取则返回回退地址
+     */
+    String getFaviconByUrl(String url);
 }

@@ -277,6 +277,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         return webTitleFetcher.fetchTitle(url);
     }
 
+    @Override
+    public String getFaviconByUrl(String url) {
+        return webTitleFetcher.fetchFavicon(url);
+    }
+
     private ShortLinkDO buildSameGroupUpdateDO(ShortLinkUpdateReqDTO requestParam) {
         return ShortLinkDO.builder()
                 .originUrl(requestParam.getOriginUrl())

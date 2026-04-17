@@ -84,4 +84,12 @@ public class ShortLinkController {
     public Result<String> getTitleByUrl(@RequestParam String url) {
         return Results.success(shortLinkService.getTitleByUrl(url));
     }
+
+    /**
+     * 获取目标网站图标
+     */
+    @GetMapping("/api/shortlink/v1/favicon")
+    public Result<String> getFaviconByUrl(@RequestParam String url) {
+        return Results.success(shortLinkService.getFaviconByUrl(url));
+    }
 }

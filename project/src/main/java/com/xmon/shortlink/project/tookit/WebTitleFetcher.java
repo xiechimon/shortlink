@@ -50,4 +50,57 @@ public class WebTitleFetcher {
         }
         return null;
     }
+
+    /**
+     * 获取目标 URL 的网页图标 (Favicon)
+     *
+     * @param originUrl 目标链接
+     * @return 网页图标绝对地址；若无法获取则返回默认回退地址
+     */
+    public String fetchFavicon(String originUrl) {
+        if (originUrl == null || originUrl.isBlank()) {
+            return null;
+        }
+        if (!originUrl.toLowerCase().startsWith("http://") && !originUrl.toLowerCase().startsWith("https://")) {
+            originUrl = "http://" + originUrl;
+        }
+
+        try {
+            Document document = Jsoup.connect(originUrl)
+                    .timeout(TIMEOUT_MS)
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                    .get();
+
+            // 匹配 rel 属性含有 icon 或 shortcut icon 的 link 标签
+            org.jsoup.nodes.Element iconElement = document.select("link[rel~=(?i)^(shortcut )?icon]").first();
+            if (iconElement != null) {
+                // abs:href 让 Jsoup 自动根据 baseURL 解析为绝对路径
+                String faviconUrl = iconElement.attr("abs:href");
+                if (faviconUrl != null && !faviconUrl.isBlank()) {
+                    return faviconUrl;
+                }
+            }
+            
+            // 如果同样找不到，还有一些可能使用了 apple-touch-icon
+            iconElement = document.select("link[rel~=(?i)^apple-touch-icon]").first();
+            if (iconElement != null) {
+                String faviconUrl = iconElement.attr("abs:href");
+                if (faviconUrl != null && !faviconUrl.isBlank()) {
+                    return faviconUrl;
+                }
+            }
+            
+        } catch (Exception e) {
+            log.warn("[WebTitleFetcher] 获取 {} 网页图标失败，执行回退策略：{}", originUrl, e.getMessage());
+        }
+
+        // 兜底回退：尝试手动拼凑根目录下的 favicon.ico
+        try {
+            java.net.URL parsedUrl = new java.net.URL(originUrl);
+            return String.format("%s://%s/favicon.ico", parsedUrl.getProtocol(), parsedUrl.getHost());
+        } catch (Exception ignored) {
+        }
+
+        return null;
+    }
 }

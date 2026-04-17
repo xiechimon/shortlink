@@ -81,4 +81,16 @@ public interface ShortLinkRemoteService {
         return JSON.parseObject(resultStr, new TypeReference<>() {
         });
     }
+
+    /**
+     * 根据 URL 获取目标网站的网页图标
+     */
+    default Result<String> getFaviconByUrl(String url) {
+        HashMap<String, Object> requestMap = new HashMap<>();
+        requestMap.put("url", url);
+        String resultStr = HttpUtil.get(SHORT_LINK_SERVICE_BASE_URL + "/favicon", requestMap);
+
+        return JSON.parseObject(resultStr, new TypeReference<>() {
+        });
+    }
 }
