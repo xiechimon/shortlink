@@ -12,6 +12,7 @@ import com.xmon.shortlink.admin.dao.mapper.GroupMapper;
 import com.xmon.shortlink.admin.remote.ShortLinkRemoteService;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinPageReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinRecoverReqDTO;
+import com.xmon.shortlink.admin.remote.dto.req.RecycleBinRemoveReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
 import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
 import lombok.RequiredArgsConstructor;
@@ -76,6 +77,15 @@ public class RecycleBinController {
     @PostMapping("/api/shortlink/admin/v1/recycle-bin/recover")
     public Result<Void> recoverRecycleBin(@RequestBody RecycleBinRecoverReqDTO requestParam) {
         shortLinkRemoteService.recoverRecycleBin(requestParam);
+        return Results.success();
+    }
+
+    /**
+     * 彻底删除短链接
+     */
+    @PostMapping("/api/shortlink/admin/v1/recycle-bin/remove")
+    public Result<Void> removeRecycleBin(@RequestBody RecycleBinRemoveReqDTO requestParam) {
+        shortLinkRemoteService.removeRecycleBin(requestParam);
         return Results.success();
     }
 }

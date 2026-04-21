@@ -12,6 +12,7 @@ import com.xmon.shortlink.project.dao.entity.ShortLinkDO;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.xmon.shortlink.project.dto.req.RecycleBinPageReqDTO;
 import com.xmon.shortlink.project.dto.req.RecycleBinRecoverReqDTO;
+import com.xmon.shortlink.project.dto.req.RecycleBinRemoveReqDTO;
 import com.xmon.shortlink.project.dto.req.RecycleBinSaveReqDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.project.service.RecycleBinService;
@@ -62,7 +63,6 @@ public class RecycleBinServiceImpl implements RecycleBinService {
         IPage<ShortLinkDO> resultPage = shortLinkMapper.selectPage(requestParam, queryWrapper);
         return resultPage.convert(each -> {
             ShortLinkPageRespDTO result = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
-            result.setFullShortUrl("http://" + each.getFullShortUrl());
             return result;
         });
     }
@@ -83,6 +83,22 @@ public class RecycleBinServiceImpl implements RecycleBinService {
         shortLinkMapper.update(updateDO, updateWrapper);
 
         // 删除当初由于 enableStatus=1 进而导致的 Redis 空值缓存，以便下一次正常路由访问时触发从库中重新加载数据
+        stringRedisTemplate.delete(RedisCacheConstant.buildGotoIsNullShortLinkKey(requestParam.getFullShortUrl()));
+    }
+
+    @Override
+    public void removeRecycleBin(RecycleBinRemoveReqDTO requestParam) {
+        // 构建删除条件：必须是当前分组下的已被移动到回收站的用户
+        LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
+                .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
+                .eq(ShortLinkDO::getGid, requestParam.getGid())
+                .eq(ShortLinkDO::getEnableStatus, 1)
+                .eq(ShortLinkDO::getDelFlag, 0);
+
+        // 执行物理删除
+        shortLinkMapper.delete(queryWrapper);
+
+        // 删除遗留的可能空值缓存（保险措施）
         stringRedisTemplate.delete(RedisCacheConstant.buildGotoIsNullShortLinkKey(requestParam.getFullShortUrl()));
     }
 }

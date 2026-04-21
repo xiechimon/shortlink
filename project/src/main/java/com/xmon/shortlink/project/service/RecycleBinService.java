@@ -3,6 +3,7 @@ package com.xmon.shortlink.project.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.xmon.shortlink.project.dto.req.RecycleBinPageReqDTO;
 import com.xmon.shortlink.project.dto.req.RecycleBinRecoverReqDTO;
+import com.xmon.shortlink.project.dto.req.RecycleBinRemoveReqDTO;
 import com.xmon.shortlink.project.dto.req.RecycleBinSaveReqDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 
@@ -32,4 +33,11 @@ public interface RecycleBinService {
      * @param requestParam 恢复请求参数
      */
     void recoverRecycleBin(RecycleBinRecoverReqDTO requestParam);
+
+    /**
+     * 从回收站彻底删除短链接
+     *
+     * @param requestParam 删除请求参数
+     */
+    void removeRecycleBin(RecycleBinRemoveReqDTO requestParam);
 }
