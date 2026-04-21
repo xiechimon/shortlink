@@ -1,8 +1,8 @@
 package com.xmon.shortlink.project.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.xmon.shortlink.project.dto.req.RecycleBinPageReqDTO;
 import com.xmon.shortlink.project.dto.req.RecycleBinSaveReqDTO;
-import com.xmon.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 
 /**
@@ -20,8 +20,8 @@ public interface RecycleBinService {
     /**
      * 分页查询回收站短链接
      *
-     * @param requestParam 分页查询请求参数
+     * @param requestParam 分页查询请求参数（gidList 由 admin 层自动填充）
      * @return 返回回收站内短链接分页数据
      */
-    IPage<ShortLinkPageRespDTO> pageRecycleBin(ShortLinkPageReqDTO requestParam);
+    IPage<ShortLinkPageRespDTO> pageRecycleBin(RecycleBinPageReqDTO requestParam);
 }

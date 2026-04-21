@@ -12,6 +12,7 @@ import com.xmon.shortlink.admin.remote.dto.req.ShortLinkUpdateReqDTO;
 import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
 import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
+import com.xmon.shortlink.admin.remote.dto.req.RecycleBinPageReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
 
 import java.util.HashMap;
@@ -105,9 +106,9 @@ public interface ShortLinkRemoteService {
     /**
      * 分页查询回收站短链接
      */
-    default Result<IPage<ShortLinkPageRespDTO>> pageRecycleBin(ShortLinkPageReqDTO requestParam) {
+    default Result<IPage<ShortLinkPageRespDTO>> pageRecycleBin(RecycleBinPageReqDTO requestParam) {
         HashMap<String, Object> requestMap = new HashMap<>();
-        requestMap.put("gid", requestParam.getGid());
+        requestMap.put("gidList", requestParam.getGidList());
         requestMap.put("current", requestParam.getCurrent());
         requestMap.put("size", requestParam.getSize());
         String resultPageStr = HttpUtil.get(SHORT_LINK_SERVICE_BASE_URL + "/recycle-bin/page", requestMap);

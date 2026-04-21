@@ -3,8 +3,8 @@ package com.xmon.shortlink.project.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.xmon.shortlink.project.common.convention.result.Result;
 import com.xmon.shortlink.project.common.convention.result.Results;
+import com.xmon.shortlink.project.dto.req.RecycleBinPageReqDTO;
 import com.xmon.shortlink.project.dto.req.RecycleBinSaveReqDTO;
-import com.xmon.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.project.service.RecycleBinService;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +35,7 @@ public class RecycleBinController {
      * 分页查询回收站短链接
      */
     @GetMapping("/api/shortlink/v1/recycle-bin/page")
-    public Result<IPage<ShortLinkPageRespDTO>> pageRecycleBin(ShortLinkPageReqDTO requestParam) {
+    public Result<IPage<ShortLinkPageRespDTO>> pageRecycleBin(RecycleBinPageReqDTO requestParam) {
         return Results.success(recycleBinService.pageRecycleBin(requestParam));
     }
 }

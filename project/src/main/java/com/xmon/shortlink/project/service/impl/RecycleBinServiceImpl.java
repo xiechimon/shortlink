@@ -1,15 +1,17 @@
 package com.xmon.shortlink.project.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xmon.shortlink.project.common.constant.RedisCacheConstant;
 import com.xmon.shortlink.project.dao.entity.ShortLinkDO;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkMapper;
+import com.xmon.shortlink.project.dto.req.RecycleBinPageReqDTO;
 import com.xmon.shortlink.project.dto.req.RecycleBinSaveReqDTO;
-import com.xmon.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.project.service.RecycleBinService;
 import lombok.RequiredArgsConstructor;
@@ -45,9 +47,13 @@ public class RecycleBinServiceImpl implements RecycleBinService {
     }
 
     @Override
-    public IPage<ShortLinkPageRespDTO> pageRecycleBin(ShortLinkPageReqDTO requestParam) {
+    public IPage<ShortLinkPageRespDTO> pageRecycleBin(RecycleBinPageReqDTO requestParam) {
+        if (CollUtil.isEmpty(requestParam.getGidList())) {
+            return new Page<>();
+        }
+
         LambdaQueryWrapper<ShortLinkDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkDO.class)
-                .eq(ShortLinkDO::getGid, requestParam.getGid())
+                .in(ShortLinkDO::getGid, requestParam.getGidList())
                 .eq(ShortLinkDO::getEnableStatus, 1)
                 .eq(ShortLinkDO::getDelFlag, 0)
                 .orderByDesc(ShortLinkDO::getUpdateTime);
@@ -55,7 +61,6 @@ public class RecycleBinServiceImpl implements RecycleBinService {
         IPage<ShortLinkDO> resultPage = shortLinkMapper.selectPage(requestParam, queryWrapper);
         return resultPage.convert(each -> {
             ShortLinkPageRespDTO result = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
-            // 这里简单拼接 http 前缀用于展示
             result.setFullShortUrl("http://" + each.getFullShortUrl());
             return result;
         });
