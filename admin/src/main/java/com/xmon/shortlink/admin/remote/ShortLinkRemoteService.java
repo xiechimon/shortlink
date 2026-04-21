@@ -13,6 +13,7 @@ import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkCreateRespDTO;
 import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinPageReqDTO;
+import com.xmon.shortlink.admin.remote.dto.req.RecycleBinRecoverReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
 
 import java.util.HashMap;
@@ -115,5 +116,12 @@ public interface ShortLinkRemoteService {
 
         return JSON.parseObject(resultPageStr, new TypeReference<>() {
         });
+    }
+
+    /**
+     * 从回收站恢复短链接
+     */
+    default void recoverRecycleBin(RecycleBinRecoverReqDTO requestParam) {
+        HttpUtil.post(SHORT_LINK_SERVICE_BASE_URL + "/recycle-bin/recover", JSON.toJSONString(requestParam));
     }
 }

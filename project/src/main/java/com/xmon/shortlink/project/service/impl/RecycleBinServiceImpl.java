@@ -11,6 +11,7 @@ import com.xmon.shortlink.project.common.constant.RedisCacheConstant;
 import com.xmon.shortlink.project.dao.entity.ShortLinkDO;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.xmon.shortlink.project.dto.req.RecycleBinPageReqDTO;
+import com.xmon.shortlink.project.dto.req.RecycleBinRecoverReqDTO;
 import com.xmon.shortlink.project.dto.req.RecycleBinSaveReqDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.project.service.RecycleBinService;
@@ -64,5 +65,24 @@ public class RecycleBinServiceImpl implements RecycleBinService {
             result.setFullShortUrl("http://" + each.getFullShortUrl());
             return result;
         });
+    }
+
+    @Override
+    public void recoverRecycleBin(RecycleBinRecoverReqDTO requestParam) {
+        // 构建更新条件：必须是当前分组下的已被移动到回收站的用户
+        LambdaUpdateWrapper<ShortLinkDO> updateWrapper = Wrappers.lambdaUpdate(ShortLinkDO.class)
+                .eq(ShortLinkDO::getFullShortUrl, requestParam.getFullShortUrl())
+                .eq(ShortLinkDO::getGid, requestParam.getGid())
+                .eq(ShortLinkDO::getEnableStatus, 1)
+                .eq(ShortLinkDO::getDelFlag, 0);
+
+        // 更新状态：恢复 enableStatus 为 0
+        ShortLinkDO updateDO = ShortLinkDO.builder()
+                .enableStatus(0)
+                .build();
+        shortLinkMapper.update(updateDO, updateWrapper);
+
+        // 删除当初由于 enableStatus=1 进而导致的 Redis 空值缓存，以便下一次正常路由访问时触发从库中重新加载数据
+        stringRedisTemplate.delete(RedisCacheConstant.buildGotoIsNullShortLinkKey(requestParam.getFullShortUrl()));
     }
 }

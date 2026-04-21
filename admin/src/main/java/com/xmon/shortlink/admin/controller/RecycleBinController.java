@@ -1,3 +1,5 @@
+package com.xmon.shortlink.admin.controller;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -9,6 +11,7 @@ import com.xmon.shortlink.admin.dao.entity.GroupDO;
 import com.xmon.shortlink.admin.dao.mapper.GroupMapper;
 import com.xmon.shortlink.admin.remote.ShortLinkRemoteService;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinPageReqDTO;
+import com.xmon.shortlink.admin.remote.dto.req.RecycleBinRecoverReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
 import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkPageRespDTO;
 import lombok.RequiredArgsConstructor;
@@ -65,5 +68,14 @@ public class RecycleBinController {
         // 将 gidList 填入请求对象后一并透传
         requestParam.setGidList(gidList);
         return Results.success(shortLinkRemoteService.pageRecycleBin(requestParam).getData());
+    }
+
+    /**
+     * 从回收站恢复短链接
+     */
+    @PostMapping("/api/shortlink/admin/v1/recycle-bin/recover")
+    public Result<Void> recoverRecycleBin(@RequestBody RecycleBinRecoverReqDTO requestParam) {
+        shortLinkRemoteService.recoverRecycleBin(requestParam);
+        return Results.success();
     }
 }
