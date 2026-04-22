@@ -17,6 +17,9 @@ import com.xmon.shortlink.project.dao.entity.ShortLinkDO;
 import com.xmon.shortlink.project.dao.entity.ShortLinkGotoDO;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkGotoMapper;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkMapper;
+import com.xmon.shortlink.project.dao.mapper.LinkAccessStatsMapper;
+import com.xmon.shortlink.project.dao.entity.LinkAccessStatsDO;
+import cn.hutool.core.date.DateUtil;
 import com.xmon.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.xmon.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xmon.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
@@ -27,6 +30,8 @@ import com.xmon.shortlink.project.service.ShortLinkService;
 import com.xmon.shortlink.project.tookit.HashUtil;
 import com.xmon.shortlink.project.tookit.ShortLinkCacheUtil;
 import com.xmon.shortlink.project.tookit.WebTitleFetcher;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +62,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final StringRedisTemplate stringRedisTemplate;
     private final RedissonClient redissonClient;
     private final WebTitleFetcher webTitleFetcher;
+    private final LinkAccessStatsMapper linkAccessStatsMapper;
     @Value("${short-link.default-protocol:http}")
     private String defaultProtocol;
     @Value("${short-link.not-found-redirect-url:}")
@@ -108,7 +114,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     public void restoreUrl(String domain, String shortUri, HttpServletRequest request, HttpServletResponse response) {
         Set<String> candidateFullShortUrls = buildCandidateFullShortUrls(domain, shortUri);
         for (String fullShortUrl : candidateFullShortUrls) {
-            if (tryRestoreByFullShortUrl(fullShortUrl, response)) {
+            if (tryRestoreByFullShortUrl(fullShortUrl, request, response)) {
                 return;
             }
         }
@@ -119,7 +125,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         response.sendError(HttpServletResponse.SC_NOT_FOUND);
     }
 
-    private boolean tryRestoreByFullShortUrl(String fullShortUrl, HttpServletResponse response) {
+    private boolean tryRestoreByFullShortUrl(String fullShortUrl, ServletRequest request, ServletResponse response) {
         String cacheKey = RedisCacheConstant.buildGotoShortLinkKey(fullShortUrl);
         String nullCacheKey = RedisCacheConstant.buildGotoIsNullShortLinkKey(fullShortUrl);
         if (stringRedisTemplate.hasKey(nullCacheKey)) {
@@ -127,7 +133,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         }
         // 一级：先查 Redis 热缓存，命中则直接返回，避免访问数据库。
         String cachedOriginUrl = stringRedisTemplate.opsForValue().get(cacheKey);
-        if (tryRespondFromCache(cachedOriginUrl, response)) {
+        if (tryRespondFromCache(fullShortUrl, cachedOriginUrl, request, response)) {
             return true;
         }
 
@@ -147,7 +153,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                 Thread.currentThread().interrupt();
             }
             String retriedOriginUrl = stringRedisTemplate.opsForValue().get(cacheKey);
-            if (tryRespondFromCache(retriedOriginUrl, response)) {
+            if (tryRespondFromCache(fullShortUrl, retriedOriginUrl, request, response)) {
                 return true;
             }
             // 缓存仍未就绪，降级：直接查 DB（不加锁，接受少量并发回源）
@@ -155,7 +161,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         try {
             String lockedCachedOriginUrl = stringRedisTemplate.opsForValue().get(cacheKey);
-            if (tryRespondFromCache(lockedCachedOriginUrl, response)) {
+            if (tryRespondFromCache(fullShortUrl, lockedCachedOriginUrl, request, response)) {
                 return true;
             }
 
@@ -184,7 +190,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
             // 回源成功后写回缓存，后续请求走 Redis。
             cacheShortLink(cacheKey, shortLinkDO);
-            sendRedirect(response, shortLinkDO.getOriginUrl());
+            shortLinkStats(fullShortUrl, shortLinkDO.getGid(), request, response);
+            sendRedirect((HttpServletResponse) response, shortLinkDO.getOriginUrl());
             return true;
         } finally {
             if (lock.isHeldByCurrentThread()) {
@@ -370,12 +377,50 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     }
 
     @SneakyThrows
-    private boolean tryRespondFromCache(String cachedOriginUrl, HttpServletResponse response) {
+    private boolean tryRespondFromCache(String fullShortUrl, String cachedOriginUrl, ServletRequest request, ServletResponse response) {
         if (cachedOriginUrl != null && !cachedOriginUrl.isBlank()) {
-            sendRedirect(response, cachedOriginUrl);
+            shortLinkStats(fullShortUrl, null, request, response);
+            sendRedirect((HttpServletResponse) response, cachedOriginUrl);
             return true;
         }
         return false;
+    }
+
+    private void shortLinkStats(String fullShortUrl, String gid, ServletRequest request, ServletResponse response) {
+        // 异步执行，避免统计逻辑影响访问性能；异常吞掉日志记录，不抛出，保证访问链路稳定性
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                String finalGid = gid;
+                if (finalGid == null) {
+                    // 根据短链接去数据库查一下它到底属于哪个分组
+                    LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
+                            .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl)
+                            .last("LIMIT 1");
+                    ShortLinkGotoDO shortLinkGotoDO = shortLinkGotoMapper.selectOne(queryWrapper);
+                    if (shortLinkGotoDO != null) {
+                        finalGid = shortLinkGotoDO.getGid();
+                    }
+                }
+                if (finalGid != null) {
+                    // 统计访问数据：每次访问都记录一条访问记录，包含访问时间、访问的短链接、所属分组、访问来源等信息；后续可以基于这些数据进行分析和报表展示
+                    int hour = DateUtil.hour(new Date(), true);
+                    int weekday = DateUtil.dayOfWeekEnum(new Date()).getIso8601Value();
+                    LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
+                            .pv(1)
+                            .uv(0)
+                            .uip(0)
+                            .hour(hour)
+                            .weekday(weekday)
+                            .fullShortUrl(fullShortUrl)
+                            .gid(finalGid)
+                            .date(new Date())
+                            .build();
+                    linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
+                }
+            } catch (Throwable ex) {
+                log.error("短链接访问量统计异常", ex);
+            }
+        });
     }
 
     @SneakyThrows
