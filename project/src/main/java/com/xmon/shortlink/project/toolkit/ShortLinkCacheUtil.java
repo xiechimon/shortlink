@@ -1,4 +1,4 @@
-package com.xmon.shortlink.project.tookit;
+package com.xmon.shortlink.project.toolkit;
 
 import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;

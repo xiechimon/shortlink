@@ -1,4 +1,4 @@
-package com.xmon.shortlink.project.tookit;
+package com.xmon.shortlink.project.toolkit;
 
 import cn.hutool.http.HttpUtil;
 import com.alibaba.fastjson2.JSON;

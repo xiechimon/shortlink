@@ -1,4 +1,4 @@
-package com.xmon.shortlink.project.tookit;
+package com.xmon.shortlink.project.toolkit;
 
 import jakarta.servlet.http.HttpServletRequest;
 
