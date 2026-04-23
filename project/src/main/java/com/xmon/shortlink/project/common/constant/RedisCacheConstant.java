@@ -39,9 +39,27 @@ public final class RedisCacheConstant {
     public static final long GOTO_LINK_NULL_TTL_SECONDS = 30L;
 
     /**
+     * 短链接 UV 统计 Redis Key 模板
+     * 格式：short-link:stats:uv:{fullShortUrl}:{date}
+     * 类型：Set，存储访问过该短链接的所有 UV Cookie 值。
+     * TTL：25 小时，保证跨天后自然过期。
+     */
+    public static final String STATS_UV_SHORT_LINK_KEY = "short-link:stats:uv:%s:%s";
+
+    /**
+     * 短链接 UV 统计 Cookie 名称
+     */
+    public static final String STATS_UV_COOKIE_NAME = "uv";
+
+    /**
+     * 短链接 UV 统计 Cookie 有效期（秒）：1 个月
+     */
+    public static final int STATS_UV_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+
+    /**
      * 构建短链接跳转缓存 key，统一 key 生成逻辑，避免业务层散落 String.format。
      */
-    public static String  buildGotoShortLinkKey(String fullShortUrl) {
+    public static String buildGotoShortLinkKey(String fullShortUrl) {
         return String.format(GOTO_SHORT_LINK_KEY, fullShortUrl);
     }
 
@@ -57,5 +75,21 @@ public final class RedisCacheConstant {
      */
     public static String buildGotoIsNullShortLinkKey(String fullShortUrl) {
         return String.format(GOTO_IS_NULL_SHORT_LINK_KEY, fullShortUrl);
+    }
+
+    /**
+     * 短链接 gid 缓存 Key 模板
+     */
+    public static final String GOTO_SHORT_LINK_GID_KEY = "short-link:goto:gid:%s";
+
+    /**
+     * 构建短链接 UV 统计 Redis key（以短链接 + 日期为维度）。
+     */
+    public static String buildStatsUvKey(String fullShortUrl, String date) {
+        return String.format(STATS_UV_SHORT_LINK_KEY, fullShortUrl, date);
+    }
+
+    public static String buildGotoShortLinkGidKey(String fullShortUrl) {
+        return String.format(GOTO_SHORT_LINK_GID_KEY, fullShortUrl);
     }
 }

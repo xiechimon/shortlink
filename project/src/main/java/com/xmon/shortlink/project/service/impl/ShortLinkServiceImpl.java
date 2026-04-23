@@ -1,6 +1,7 @@
 package com.xmon.shortlink.project.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.text.StrBuilder;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -20,6 +21,7 @@ import com.xmon.shortlink.project.dao.mapper.ShortLinkMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkAccessStatsMapper;
 import com.xmon.shortlink.project.dao.entity.LinkAccessStatsDO;
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.lang.UUID;
 import com.xmon.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.xmon.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xmon.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
@@ -32,6 +34,7 @@ import com.xmon.shortlink.project.tookit.ShortLinkCacheUtil;
 import com.xmon.shortlink.project.tookit.WebTitleFetcher;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +50,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -56,6 +62,12 @@ import java.util.concurrent.TimeUnit;
 @Service
 @RequiredArgsConstructor
 public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLinkDO> implements ShortLinkService {
+
+    private static final ExecutorService STATS_EXECUTOR = new ThreadPoolExecutor(
+            4, 64, 60, TimeUnit.SECONDS, new SynchronousQueue<>(),
+            Thread.ofVirtual().name("stats-", 0).factory(),
+            new ThreadPoolExecutor.CallerRunsPolicy()
+    );
 
     private final RBloomFilter<String> shortLinkCachePenetrationBloomFilter;
     private final ShortLinkGotoMapper shortLinkGotoMapper;
@@ -361,12 +373,15 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         long ttlMillis = ShortLinkCacheUtil.getLinkCacheValidTime(shortLinkDO.getValidDate());
         if (ttlMillis > 0) {
             stringRedisTemplate.opsForValue().set(cacheKey, shortLinkDO.getOriginUrl(), ttlMillis, TimeUnit.MILLISECONDS);
+            String gidCacheKey = RedisCacheConstant.buildGotoShortLinkGidKey(shortLinkDO.getFullShortUrl());
+            stringRedisTemplate.opsForValue().set(gidCacheKey, shortLinkDO.getGid(), ttlMillis, TimeUnit.MILLISECONDS);
         }
     }
 
     private void evictShortLinkCache(String fullShortUrl) {
         stringRedisTemplate.delete(RedisCacheConstant.buildGotoShortLinkKey(fullShortUrl));
         stringRedisTemplate.delete(RedisCacheConstant.buildGotoIsNullShortLinkKey(fullShortUrl));
+        stringRedisTemplate.delete(RedisCacheConstant.buildGotoShortLinkGidKey(fullShortUrl));
     }
 
     private void warmupShortLinkCache(ShortLinkDO shortLinkDO) {
@@ -379,7 +394,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     @SneakyThrows
     private boolean tryRespondFromCache(String fullShortUrl, String cachedOriginUrl, ServletRequest request, ServletResponse response) {
         if (cachedOriginUrl != null && !cachedOriginUrl.isBlank()) {
-            shortLinkStats(fullShortUrl, null, request, response);
+            String gidCacheKey = RedisCacheConstant.buildGotoShortLinkGidKey(fullShortUrl);
+            String cachedGid = stringRedisTemplate.opsForValue().get(gidCacheKey);
+            shortLinkStats(fullShortUrl, cachedGid, request, response);
             sendRedirect((HttpServletResponse) response, cachedOriginUrl);
             return true;
         }
@@ -387,12 +404,40 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     }
 
     private void shortLinkStats(String fullShortUrl, String gid, ServletRequest request, ServletResponse response) {
+        // 提前在主线程中获取 Cookie 相关数据，避免异步线程里操作已提交的 Response
+        HttpServletRequest httpRequest = (HttpServletRequest) request;
+        HttpServletResponse httpResponse = (HttpServletResponse) response;
+
+        // UV 判断：读取访客的 UV Cookie
+        String uvValue = null;
+        Cookie[] cookies = httpRequest.getCookies();
+        if (ArrayUtil.isNotEmpty(cookies)) {
+            for (Cookie cookie : cookies) {
+                if (RedisCacheConstant.STATS_UV_COOKIE_NAME.equals(cookie.getName())) {
+                    uvValue = cookie.getValue();
+                    break;
+                }
+            }
+        }
+        if (uvValue == null) {
+            // 新访客：生成 UUID 并写入 Cookie（有效期 1 个月）
+            uvValue = UUID.fastUUID().toString();
+            Cookie uvCookie = new Cookie(RedisCacheConstant.STATS_UV_COOKIE_NAME, uvValue);
+            uvCookie.setMaxAge(RedisCacheConstant.STATS_UV_COOKIE_MAX_AGE);
+            uvCookie.setPath("/");
+            httpResponse.addCookie(uvCookie);
+        }
+
+        // 将 Cookie 值拷贝到 final 变量，供内部匿名类使用
+        final String finalUvValue = uvValue;
+
         // 异步执行，避免统计逻辑影响访问性能；异常吞掉日志记录，不抛出，保证访问链路稳定性
         java.util.concurrent.CompletableFuture.runAsync(() -> {
+            String uvRedisKey = null;
+            Long uvAdded = null;
             try {
                 String finalGid = gid;
                 if (finalGid == null) {
-                    // 根据短链接去数据库查一下它到底属于哪个分组
                     LambdaQueryWrapper<ShortLinkGotoDO> queryWrapper = Wrappers.lambdaQuery(ShortLinkGotoDO.class)
                             .eq(ShortLinkGotoDO::getFullShortUrl, fullShortUrl)
                             .last("LIMIT 1");
@@ -402,25 +447,36 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     }
                 }
                 if (finalGid != null) {
-                    // 统计访问数据：每次访问都记录一条访问记录，包含访问时间、访问的短链接、所属分组、访问来源等信息；后续可以基于这些数据进行分析和报表展示
-                    int hour = DateUtil.hour(new Date(), true);
-                    int weekday = DateUtil.dayOfWeekEnum(new Date()).getIso8601Value();
+                    Date now = new Date();
+                    int hour = DateUtil.hour(now, true);
+                    int weekday = DateUtil.dayOfWeekEnum(now).getIso8601Value();
+                    String today = DateUtil.formatDate(now);
+
+                    uvRedisKey = RedisCacheConstant.buildStatsUvKey(fullShortUrl, today);
+                    uvAdded = stringRedisTemplate.opsForSet().add(uvRedisKey, finalUvValue);
+                    if (uvAdded != null && uvAdded > 0) {
+                        redissonClient.getBucket(uvRedisKey).expire(25, TimeUnit.HOURS);
+                    }
+                    log.info("短链接 UV 统计: fullShortUrl={}, uvRedisKey={}, uvValue={}, uvAdded={}", fullShortUrl, uvRedisKey, finalUvValue, uvAdded);
+                    int uvIncrement = (uvAdded != null && uvAdded > 0) ? 1 : 0;
+
                     LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
                             .pv(1)
-                            .uv(0)
+                            .uv(uvIncrement)
                             .uip(0)
                             .hour(hour)
                             .weekday(weekday)
                             .fullShortUrl(fullShortUrl)
                             .gid(finalGid)
-                            .date(new Date())
+                            .date(now)
                             .build();
                     linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
                 }
             } catch (Throwable ex) {
-                log.error("短链接访问量统计异常", ex);
+                log.error("短链接访问量统计异常 fullShortUrl={}, uvRedisKey={}, uvValue={}, uvAdded={}",
+                        fullShortUrl, uvRedisKey, finalUvValue, uvAdded, ex);
             }
-        });
+        }, STATS_EXECUTOR);
     }
 
     @SneakyThrows
