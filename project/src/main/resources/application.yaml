@@ -16,3 +16,17 @@ short-link:
   default-protocol: http
   # 短链接不存在时的跳转页面，为空则默认返回404错误
   not-found-redirect-url: /404.html
+  stats:
+    locale:
+      # 高德 IP 定位 Key；留空时不统计地区访问
+      amap-key: bf8754c0c9efb235987a03b230e574e1
+      # 高德 IP 定位接口
+      amap-endpoint: https://restapi.amap.com/v3/ip
+      # 地区解析超时时间（毫秒）
+      timeout-millis: 3000
+      # 本地联调时允许 127.0.0.1 / 局域网地址直接写入一条固定地区数据
+      local-debug-enabled: true
+      local-debug-province: Shanghai
+      local-debug-city: Shanghai
+      local-debug-adcode: 310000
+      local-debug-country: CN

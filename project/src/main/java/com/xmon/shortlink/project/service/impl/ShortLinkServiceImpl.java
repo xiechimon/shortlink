@@ -14,12 +14,14 @@ import com.xmon.shortlink.project.common.convention.errorcode.ProjectErrorCodeEn
 import com.xmon.shortlink.project.common.convention.exception.ClientException;
 import com.xmon.shortlink.project.common.convention.exception.ServiceException;
 import com.xmon.shortlink.project.common.enums.ValidDateTypeEnum;
+import com.xmon.shortlink.project.dao.entity.LinkAccessStatsDO;
+import com.xmon.shortlink.project.dao.entity.LinkLocaleStatsDO;
 import com.xmon.shortlink.project.dao.entity.ShortLinkDO;
 import com.xmon.shortlink.project.dao.entity.ShortLinkGotoDO;
+import com.xmon.shortlink.project.dao.mapper.LinkAccessStatsMapper;
+import com.xmon.shortlink.project.dao.mapper.LinkLocaleStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkGotoMapper;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkMapper;
-import com.xmon.shortlink.project.dao.mapper.LinkAccessStatsMapper;
-import com.xmon.shortlink.project.dao.entity.LinkAccessStatsDO;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.lang.UUID;
 import com.xmon.shortlink.project.dto.req.ShortLinkCreateReqDTO;
@@ -31,6 +33,7 @@ import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.project.service.ShortLinkService;
 import com.xmon.shortlink.project.tookit.ClientIpUtil;
 import com.xmon.shortlink.project.tookit.HashUtil;
+import com.xmon.shortlink.project.tookit.LinkLocaleResolver;
 import com.xmon.shortlink.project.tookit.ShortLinkCacheUtil;
 import com.xmon.shortlink.project.tookit.WebTitleFetcher;
 import jakarta.servlet.ServletRequest;
@@ -76,6 +79,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final RedissonClient redissonClient;
     private final WebTitleFetcher webTitleFetcher;
     private final LinkAccessStatsMapper linkAccessStatsMapper;
+    private final LinkLocaleStatsMapper linkLocaleStatsMapper;
+    private final LinkLocaleResolver linkLocaleResolver;
     @Value("${short-link.default-protocol:http}")
     private String defaultProtocol;
     @Value("${short-link.not-found-redirect-url:}")
@@ -486,6 +491,20 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                             .date(now)
                             .build();
                     linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
+                    String localeGid = finalGid;
+                    linkLocaleResolver.resolve(remoteAddr).ifPresent(each -> {
+                        LinkLocaleStatsDO linkLocaleStatsDO = LinkLocaleStatsDO.builder()
+                                .fullShortUrl(fullShortUrl)
+                                .gid(localeGid)
+                                .date(now)
+                                .cnt(1)
+                                .province(each.getProvince())
+                                .city(each.getCity())
+                                .adcode(each.getAdcode())
+                                .country(each.getCountry())
+                                .build();
+                        linkLocaleStatsMapper.shortLinkLocaleStats(linkLocaleStatsDO);
+                    });
                 }
             } catch (Throwable ex) {
                 log.error("短链接访问量统计异常 fullShortUrl={}, uvRedisKey={}, uvValue={}, uvAdded={}, uipRedisKey={}, remoteAddr={}, uipAdded={}",
