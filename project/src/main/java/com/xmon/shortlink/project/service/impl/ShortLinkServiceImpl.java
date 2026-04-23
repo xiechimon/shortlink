@@ -15,11 +15,13 @@ import com.xmon.shortlink.project.common.convention.exception.ClientException;
 import com.xmon.shortlink.project.common.convention.exception.ServiceException;
 import com.xmon.shortlink.project.common.enums.ValidDateTypeEnum;
 import com.xmon.shortlink.project.dao.entity.LinkAccessStatsDO;
+import com.xmon.shortlink.project.dao.entity.LinkBrowserStatsDO;
 import com.xmon.shortlink.project.dao.entity.LinkLocaleStatsDO;
 import com.xmon.shortlink.project.dao.entity.LinkOsStatsDO;
 import com.xmon.shortlink.project.dao.entity.ShortLinkDO;
 import com.xmon.shortlink.project.dao.entity.ShortLinkGotoDO;
 import com.xmon.shortlink.project.dao.mapper.LinkAccessStatsMapper;
+import com.xmon.shortlink.project.dao.mapper.LinkBrowserStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkLocaleStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkOsStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkGotoMapper;
@@ -35,6 +37,7 @@ import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.project.service.ShortLinkService;
 import com.xmon.shortlink.project.common.cache.ShortLinkCacheUtil;
 import com.xmon.shortlink.project.service.handler.LinkLocaleResolver;
+import com.xmon.shortlink.project.service.handler.LinkBrowserResolver;
 import com.xmon.shortlink.project.service.handler.LinkOsResolver;
 import com.xmon.shortlink.project.service.handler.WebTitleFetcher;
 import com.xmon.shortlink.project.toolkit.ClientIpUtil;
@@ -82,8 +85,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final RedissonClient redissonClient;
     private final WebTitleFetcher webTitleFetcher;
     private final LinkAccessStatsMapper linkAccessStatsMapper;
+    private final LinkBrowserStatsMapper linkBrowserStatsMapper;
     private final LinkLocaleStatsMapper linkLocaleStatsMapper;
     private final LinkOsStatsMapper linkOsStatsMapper;
+    private final LinkBrowserResolver linkBrowserResolver;
     private final LinkLocaleResolver linkLocaleResolver;
     private final LinkOsResolver linkOsResolver;
     @Value("${short-link.default-protocol:http}")
@@ -497,6 +502,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                             .date(now)
                             .build();
                     linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
+                    String browser = linkBrowserResolver.resolve(userAgent);
+                    if (browser != null && !browser.isBlank()) {
+                        LinkBrowserStatsDO linkBrowserStatsDO = LinkBrowserStatsDO.builder()
+                                .fullShortUrl(fullShortUrl)
+                                .gid(finalGid)
+                                .date(now)
+                                .cnt(1)
+                                .browser(browser)
+                                .build();
+                        linkBrowserStatsMapper.shortLinkBrowserStats(linkBrowserStatsDO);
+                    }
                     String os = linkOsResolver.resolve(userAgent);
                     if (os != null && !os.isBlank()) {
                         LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
