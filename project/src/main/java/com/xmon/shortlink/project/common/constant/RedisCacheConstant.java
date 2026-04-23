@@ -47,6 +47,14 @@ public final class RedisCacheConstant {
     public static final String STATS_UV_SHORT_LINK_KEY = "short-link:stats:uv:%s:%s";
 
     /**
+     * 短链接 UIP 统计 Redis Key 模板
+     * 格式：short-link:stats:uip:{fullShortUrl}:{date}
+     * 类型：Set，存储访问过该短链接的所有客户端 IP。
+     * TTL：25 小时，保证跨天后自然过期。
+     */
+    public static final String STATS_UIP_SHORT_LINK_KEY = "short-link:stats:uip:%s:%s";
+
+    /**
      * 短链接 UV 统计 Cookie 名称
      */
     public static final String STATS_UV_COOKIE_NAME = "uv";
@@ -87,6 +95,13 @@ public final class RedisCacheConstant {
      */
     public static String buildStatsUvKey(String fullShortUrl, String date) {
         return String.format(STATS_UV_SHORT_LINK_KEY, fullShortUrl, date);
+    }
+
+    /**
+     * 构建短链接 UIP 统计 Redis key（以短链接 + 日期为维度）。
+     */
+    public static String buildStatsUipKey(String fullShortUrl, String date) {
+        return String.format(STATS_UIP_SHORT_LINK_KEY, fullShortUrl, date);
     }
 
     public static String buildGotoShortLinkGidKey(String fullShortUrl) {

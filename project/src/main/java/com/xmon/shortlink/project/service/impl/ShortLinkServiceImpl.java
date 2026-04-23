@@ -29,6 +29,7 @@ import com.xmon.shortlink.project.dto.resp.ShortLinkCreateRespDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkGroupCountQueryRespDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.project.service.ShortLinkService;
+import com.xmon.shortlink.project.tookit.ClientIpUtil;
 import com.xmon.shortlink.project.tookit.HashUtil;
 import com.xmon.shortlink.project.tookit.ShortLinkCacheUtil;
 import com.xmon.shortlink.project.tookit.WebTitleFetcher;
@@ -430,11 +431,14 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
 
         // 将 Cookie 值拷贝到 final 变量，供内部匿名类使用
         final String finalUvValue = uvValue;
+        final String remoteAddr = ClientIpUtil.getActualIp(httpRequest);
 
         // 异步执行，避免统计逻辑影响访问性能；异常吞掉日志记录，不抛出，保证访问链路稳定性
         java.util.concurrent.CompletableFuture.runAsync(() -> {
             String uvRedisKey = null;
             Long uvAdded = null;
+            String uipRedisKey = null;
+            Long uipAdded = null;
             try {
                 String finalGid = gid;
                 if (finalGid == null) {
@@ -457,13 +461,24 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     if (uvAdded != null && uvAdded > 0) {
                         redissonClient.getBucket(uvRedisKey).expire(25, TimeUnit.HOURS);
                     }
-                    log.info("短链接 UV 统计: fullShortUrl={}, uvRedisKey={}, uvValue={}, uvAdded={}", fullShortUrl, uvRedisKey, finalUvValue, uvAdded);
                     int uvIncrement = (uvAdded != null && uvAdded > 0) ? 1 : 0;
+
+                    int uipIncrement = 0;
+                    if (remoteAddr != null) {
+                        uipRedisKey = RedisCacheConstant.buildStatsUipKey(fullShortUrl, today);
+                        uipAdded = stringRedisTemplate.opsForSet().add(uipRedisKey, remoteAddr);
+                        if (uipAdded != null && uipAdded > 0) {
+                            redissonClient.getBucket(uipRedisKey).expire(25, TimeUnit.HOURS);
+                        }
+                        uipIncrement = (uipAdded != null && uipAdded > 0) ? 1 : 0;
+                    }
+                    log.info("短链接访问统计: fullShortUrl={}, uvRedisKey={}, uvValue={}, uvAdded={}, uipRedisKey={}, remoteAddr={}, uipAdded={}",
+                            fullShortUrl, uvRedisKey, finalUvValue, uvAdded, uipRedisKey, remoteAddr, uipAdded);
 
                     LinkAccessStatsDO linkAccessStatsDO = LinkAccessStatsDO.builder()
                             .pv(1)
                             .uv(uvIncrement)
-                            .uip(0)
+                            .uip(uipIncrement)
                             .hour(hour)
                             .weekday(weekday)
                             .fullShortUrl(fullShortUrl)
@@ -473,8 +488,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
                 }
             } catch (Throwable ex) {
-                log.error("短链接访问量统计异常 fullShortUrl={}, uvRedisKey={}, uvValue={}, uvAdded={}",
-                        fullShortUrl, uvRedisKey, finalUvValue, uvAdded, ex);
+                log.error("短链接访问量统计异常 fullShortUrl={}, uvRedisKey={}, uvValue={}, uvAdded={}, uipRedisKey={}, remoteAddr={}, uipAdded={}",
+                        fullShortUrl, uvRedisKey, finalUvValue, uvAdded, uipRedisKey, remoteAddr, uipAdded, ex);
             }
         }, STATS_EXECUTOR);
     }
