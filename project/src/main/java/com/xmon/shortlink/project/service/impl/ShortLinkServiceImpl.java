@@ -16,10 +16,12 @@ import com.xmon.shortlink.project.common.convention.exception.ServiceException;
 import com.xmon.shortlink.project.common.enums.ValidDateTypeEnum;
 import com.xmon.shortlink.project.dao.entity.LinkAccessStatsDO;
 import com.xmon.shortlink.project.dao.entity.LinkLocaleStatsDO;
+import com.xmon.shortlink.project.dao.entity.LinkOsStatsDO;
 import com.xmon.shortlink.project.dao.entity.ShortLinkDO;
 import com.xmon.shortlink.project.dao.entity.ShortLinkGotoDO;
 import com.xmon.shortlink.project.dao.mapper.LinkAccessStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkLocaleStatsMapper;
+import com.xmon.shortlink.project.dao.mapper.LinkOsStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkGotoMapper;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkMapper;
 import cn.hutool.core.date.DateUtil;
@@ -33,6 +35,7 @@ import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.project.service.ShortLinkService;
 import com.xmon.shortlink.project.common.cache.ShortLinkCacheUtil;
 import com.xmon.shortlink.project.service.handler.LinkLocaleResolver;
+import com.xmon.shortlink.project.service.handler.LinkOsResolver;
 import com.xmon.shortlink.project.service.handler.WebTitleFetcher;
 import com.xmon.shortlink.project.toolkit.ClientIpUtil;
 import com.xmon.shortlink.project.toolkit.HashUtil;
@@ -80,7 +83,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final WebTitleFetcher webTitleFetcher;
     private final LinkAccessStatsMapper linkAccessStatsMapper;
     private final LinkLocaleStatsMapper linkLocaleStatsMapper;
+    private final LinkOsStatsMapper linkOsStatsMapper;
     private final LinkLocaleResolver linkLocaleResolver;
+    private final LinkOsResolver linkOsResolver;
     @Value("${short-link.default-protocol:http}")
     private String defaultProtocol;
     @Value("${short-link.not-found-redirect-url:}")
@@ -437,6 +442,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         // 将 Cookie 值拷贝到 final 变量，供内部匿名类使用
         final String finalUvValue = uvValue;
         final String remoteAddr = ClientIpUtil.getActualIp(httpRequest);
+        final String userAgent = httpRequest.getHeader("User-Agent");
 
         // 异步执行，避免统计逻辑影响访问性能；异常吞掉日志记录，不抛出，保证访问链路稳定性
         java.util.concurrent.CompletableFuture.runAsync(() -> {
@@ -491,6 +497,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                             .date(now)
                             .build();
                     linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
+                    String os = linkOsResolver.resolve(userAgent);
+                    if (os != null && !os.isBlank()) {
+                        LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
+                                .fullShortUrl(fullShortUrl)
+                                .gid(finalGid)
+                                .date(now)
+                                .cnt(1)
+                                .os(os)
+                                .build();
+                        linkOsStatsMapper.shortLinkOsStats(linkOsStatsDO);
+                    }
                     String localeGid = finalGid;
                     linkLocaleResolver.resolve(remoteAddr).ifPresent(each -> {
                         LinkLocaleStatsDO linkLocaleStatsDO = LinkLocaleStatsDO.builder()
