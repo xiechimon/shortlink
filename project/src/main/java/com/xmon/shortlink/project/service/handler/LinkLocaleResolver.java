@@ -1,8 +1,9 @@
-package com.xmon.shortlink.project.toolkit;
+package com.xmon.shortlink.project.service.handler;
 
 import cn.hutool.http.HttpUtil;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.xmon.shortlink.project.dto.stats.LinkLocaleStatsInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -100,9 +101,6 @@ public class LinkLocaleResolver {
         }
     }
 
-    /**
-     * 本地联调场景下，允许对 loopback / site local 地址直接返回可落库的测试地区信息。
-     */
     private boolean isLocalOrPrivateIp(String remoteAddr) {
         try {
             InetAddress inetAddress = InetAddress.getByName(remoteAddr);
@@ -115,12 +113,6 @@ public class LinkLocaleResolver {
         }
     }
 
-    /**
-     * 归一化第三方返回值，过滤空字符串和占位符。
-     *
-     * @param value 原始值
-     * @return 规范化后的值；无效则返回 null
-     */
     private String normalize(String value) {
         if (value == null || value.isBlank() || "[]".equals(value)) {
             return null;

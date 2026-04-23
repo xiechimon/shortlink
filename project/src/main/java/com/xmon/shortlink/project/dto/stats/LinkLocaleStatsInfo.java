@@ -1,4 +1,4 @@
-package com.xmon.shortlink.project.toolkit;
+package com.xmon.shortlink.project.dto.stats;
 
 import lombok.Builder;
 import lombok.Value;
