@@ -14,12 +14,14 @@ import com.xmon.shortlink.project.common.convention.errorcode.ProjectErrorCodeEn
 import com.xmon.shortlink.project.common.convention.exception.ClientException;
 import com.xmon.shortlink.project.common.convention.exception.ServiceException;
 import com.xmon.shortlink.project.common.enums.ValidDateTypeEnum;
+import com.xmon.shortlink.project.dao.entity.LinkAccessLogsDO;
 import com.xmon.shortlink.project.dao.entity.LinkAccessStatsDO;
 import com.xmon.shortlink.project.dao.entity.LinkBrowserStatsDO;
 import com.xmon.shortlink.project.dao.entity.LinkLocaleStatsDO;
 import com.xmon.shortlink.project.dao.entity.LinkOsStatsDO;
 import com.xmon.shortlink.project.dao.entity.ShortLinkDO;
 import com.xmon.shortlink.project.dao.entity.ShortLinkGotoDO;
+import com.xmon.shortlink.project.dao.mapper.LinkAccessLogsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkAccessStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkBrowserStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkLocaleStatsMapper;
@@ -28,6 +30,7 @@ import com.xmon.shortlink.project.dao.mapper.ShortLinkGotoMapper;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkMapper;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.lang.UUID;
+import com.xmon.shortlink.project.dto.stats.LinkLocaleStatsInfo;
 import com.xmon.shortlink.project.dto.req.ShortLinkCreateReqDTO;
 import com.xmon.shortlink.project.dto.req.ShortLinkPageReqDTO;
 import com.xmon.shortlink.project.dto.req.ShortLinkUpdateReqDTO;
@@ -84,6 +87,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final StringRedisTemplate stringRedisTemplate;
     private final RedissonClient redissonClient;
     private final WebTitleFetcher webTitleFetcher;
+    private final LinkAccessLogsMapper linkAccessLogsMapper;
     private final LinkAccessStatsMapper linkAccessStatsMapper;
     private final LinkBrowserStatsMapper linkBrowserStatsMapper;
     private final LinkLocaleStatsMapper linkLocaleStatsMapper;
@@ -471,6 +475,9 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     int hour = DateUtil.hour(now, true);
                     int weekday = DateUtil.dayOfWeekEnum(now).getIso8601Value();
                     String today = DateUtil.formatDate(now);
+                    String browser = linkBrowserResolver.resolve(userAgent);
+                    String os = linkOsResolver.resolve(userAgent);
+                    Optional<LinkLocaleStatsInfo> localeStatsInfoOptional = linkLocaleResolver.resolve(remoteAddr);
 
                     uvRedisKey = RedisCacheConstant.buildStatsUvKey(fullShortUrl, today);
                     uvAdded = stringRedisTemplate.opsForSet().add(uvRedisKey, finalUvValue);
@@ -502,7 +509,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                             .date(now)
                             .build();
                     linkAccessStatsMapper.shortLinkStats(linkAccessStatsDO);
-                    String browser = linkBrowserResolver.resolve(userAgent);
                     if (browser != null && !browser.isBlank()) {
                         LinkBrowserStatsDO linkBrowserStatsDO = LinkBrowserStatsDO.builder()
                                 .fullShortUrl(fullShortUrl)
@@ -513,7 +519,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                                 .build();
                         linkBrowserStatsMapper.shortLinkBrowserStats(linkBrowserStatsDO);
                     }
-                    String os = linkOsResolver.resolve(userAgent);
                     if (os != null && !os.isBlank()) {
                         LinkOsStatsDO linkOsStatsDO = LinkOsStatsDO.builder()
                                 .fullShortUrl(fullShortUrl)
@@ -524,8 +529,17 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                                 .build();
                         linkOsStatsMapper.shortLinkOsStats(linkOsStatsDO);
                     }
+                    LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
+                            .fullShortUrl(fullShortUrl)
+                            .gid(finalGid)
+                            .user(finalUvValue)
+                            .ip(remoteAddr)
+                            .browser(browser)
+                            .os(os)
+                            .build();
+                    linkAccessLogsMapper.insert(linkAccessLogsDO);
                     String localeGid = finalGid;
-                    linkLocaleResolver.resolve(remoteAddr).ifPresent(each -> {
+                    localeStatsInfoOptional.ifPresent(each -> {
                         LinkLocaleStatsDO linkLocaleStatsDO = LinkLocaleStatsDO.builder()
                                 .fullShortUrl(fullShortUrl)
                                 .gid(localeGid)
