@@ -25,6 +25,8 @@ import com.xmon.shortlink.project.dao.mapper.LinkAccessLogsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkAccessStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkBrowserStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkLocaleStatsMapper;
+import com.xmon.shortlink.project.dao.entity.LinkDeviceStatsDO;
+import com.xmon.shortlink.project.dao.mapper.LinkDeviceStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkOsStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkGotoMapper;
 import com.xmon.shortlink.project.dao.mapper.ShortLinkMapper;
@@ -41,6 +43,7 @@ import com.xmon.shortlink.project.service.ShortLinkService;
 import com.xmon.shortlink.project.common.cache.ShortLinkCacheUtil;
 import com.xmon.shortlink.project.service.handler.LinkLocaleResolver;
 import com.xmon.shortlink.project.service.handler.LinkBrowserResolver;
+import com.xmon.shortlink.project.service.handler.LinkDeviceResolver;
 import com.xmon.shortlink.project.service.handler.LinkOsResolver;
 import com.xmon.shortlink.project.service.handler.WebTitleFetcher;
 import com.xmon.shortlink.project.toolkit.ClientIpUtil;
@@ -92,9 +95,11 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkBrowserStatsMapper linkBrowserStatsMapper;
     private final LinkLocaleStatsMapper linkLocaleStatsMapper;
     private final LinkOsStatsMapper linkOsStatsMapper;
+    private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkBrowserResolver linkBrowserResolver;
     private final LinkLocaleResolver linkLocaleResolver;
     private final LinkOsResolver linkOsResolver;
+    private final LinkDeviceResolver linkDeviceResolver;
     @Value("${short-link.default-protocol:http}")
     private String defaultProtocol;
     @Value("${short-link.not-found-redirect-url:}")
@@ -477,6 +482,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     String today = DateUtil.formatDate(now);
                     String browser = linkBrowserResolver.resolve(userAgent);
                     String os = linkOsResolver.resolve(userAgent);
+                    String device = linkDeviceResolver.resolve(userAgent);
                     Optional<LinkLocaleStatsInfo> localeStatsInfoOptional = linkLocaleResolver.resolve(remoteAddr);
 
                     uvRedisKey = RedisCacheConstant.buildStatsUvKey(fullShortUrl, today);
@@ -528,6 +534,16 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                                 .os(os)
                                 .build();
                         linkOsStatsMapper.shortLinkOsStats(linkOsStatsDO);
+                    }
+                    if (device != null && !device.isBlank()) {
+                        LinkDeviceStatsDO linkDeviceStatsDO = LinkDeviceStatsDO.builder()
+                                .fullShortUrl(fullShortUrl)
+                                .gid(finalGid)
+                                .date(now)
+                                .cnt(1)
+                                .device(device)
+                                .build();
+                        linkDeviceStatsMapper.shortLinkDeviceState(linkDeviceStatsDO);
                     }
                     LinkAccessLogsDO linkAccessLogsDO = LinkAccessLogsDO.builder()
                             .fullShortUrl(fullShortUrl)
