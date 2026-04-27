@@ -105,8 +105,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkOsResolver linkOsResolver;
     private final LinkDeviceResolver linkDeviceResolver;
     private final LinkNetworkResolver linkNetworkResolver;
-    @Value("${short-link.default-protocol:http}")
-    private String defaultProtocol;
     @Value("${short-link.not-found-redirect-url:}")
     private String notFoundRedirectUrl;
 
@@ -147,7 +145,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         return ShortLinkCreateRespDTO.builder()
                 .gid(shortLinkDO.getGid())
                 .originUrl(shortLinkDO.getOriginUrl())
-                .fullShortUrl(buildDisplayShortUrl(shortLinkDO.getFullShortUrl()))
+                .fullShortUrl(shortLinkDO.getFullShortUrl())
                 .build();
     }
 
@@ -305,7 +303,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
         IPage<ShortLinkDO> resultPage = baseMapper.selectPage(requestParam, queryWrapper);
         return resultPage.convert(each -> {
             ShortLinkPageRespDTO result = BeanUtil.toBean(each, ShortLinkPageRespDTO.class);
-            result.setFullShortUrl(buildDisplayShortUrl(each.getFullShortUrl()));
             return result;
         });
     }
@@ -381,10 +378,6 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
             return null;
         }
         return domain.replaceFirst("^https?://", "");
-    }
-
-    private String buildDisplayShortUrl(String fullShortUrl) {
-        return defaultProtocol + "://" + fullShortUrl;
     }
 
     private void cacheNullShortLink(String fullShortUrl) {
