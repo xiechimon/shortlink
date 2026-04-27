@@ -482,7 +482,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     String os = linkOsResolver.resolve(userAgent);
                     String device = linkDeviceResolver.resolve(userAgent);
                     String network = linkNetworkResolver.resolve(remoteAddr, userAgent);
-                    Optional<LinkLocaleStatsInfo> localeStatsInfoOptional = linkLocaleResolver.resolve(remoteAddr);
+                    LinkLocaleStatsInfo localeStatsInfo = linkLocaleResolver.resolve(remoteAddr).orElse(null);
 
                     uvRedisKey = RedisCacheConstant.buildStatsUvKey(fullShortUrl, today);
                     uvAdded = stringRedisTemplate.opsForSet().add(uvRedisKey, finalUvValue);
@@ -561,22 +561,26 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                             .ip(remoteAddr)
                             .browser(browser)
                             .os(os)
+                            .network(network)
+                            .device(device)
+                            .locale(localeStatsInfo != null
+                                    ? String.join("-", localeStatsInfo.getCountry(), localeStatsInfo.getProvince(), localeStatsInfo.getCity())
+                                    : null)
                             .build();
                     linkAccessLogsMapper.insert(linkAccessLogsDO);
-                    String localeGid = finalGid;
-                    localeStatsInfoOptional.ifPresent(each -> {
+                    if (localeStatsInfo != null) {
                         LinkLocaleStatsDO linkLocaleStatsDO = LinkLocaleStatsDO.builder()
                                 .fullShortUrl(fullShortUrl)
-                                .gid(localeGid)
+                                .gid(finalGid)
                                 .date(now)
                                 .cnt(1)
-                                .province(each.getProvince())
-                                .city(each.getCity())
-                                .adcode(each.getAdcode())
-                                .country(each.getCountry())
+                                .province(localeStatsInfo.getProvince())
+                                .city(localeStatsInfo.getCity())
+                                .adcode(localeStatsInfo.getAdcode())
+                                .country(localeStatsInfo.getCountry())
                                 .build();
                         linkLocaleStatsMapper.shortLinkLocaleStats(linkLocaleStatsDO);
-                    });
+                    }
                 }
             } catch (Throwable ex) {
                 log.error("短链接访问量统计异常 fullShortUrl={}, uvRedisKey={}, uvValue={}, uvAdded={}, uipRedisKey={}, remoteAddr={}, uipAdded={}",
