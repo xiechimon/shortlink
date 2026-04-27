@@ -703,6 +703,7 @@ CREATE TABLE `t_link_access_stats`
 (
     `id`             bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'ID',
     `full_short_url` varchar(128) DEFAULT NULL COMMENT '完整短链接',
+    `gid`            varchar(32)  DEFAULT NULL COMMENT '分组标识',
     `date`           date         DEFAULT NULL COMMENT '日期',
     `pv`             int(11)      DEFAULT NULL COMMENT '访问量',
     `uv`             int(11)      DEFAULT NULL COMMENT '独立访客数',
@@ -713,7 +714,7 @@ CREATE TABLE `t_link_access_stats`
     `update_time`    datetime     DEFAULT NULL COMMENT '修改时间',
     `del_flag`       tinyint(1)   DEFAULT NULL COMMENT '删除标识 0：未删除 1：已删除',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `idx_unique_access_stats` (`full_short_url`, `date`, `hour`)
+    UNIQUE KEY `idx_unique_access_stats` (`full_short_url`, `gid`, `date`, `hour`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
@@ -737,6 +738,7 @@ CREATE TABLE `t_link_device_stats`
 (
     `id`             bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'ID',
     `full_short_url` varchar(128) DEFAULT NULL COMMENT '完整短链接',
+    `gid`            varchar(32)  DEFAULT NULL COMMENT '分组标识',
     `date`           date         DEFAULT NULL COMMENT '日期',
     `cnt`            int(11)      DEFAULT NULL COMMENT '访问量',
     `device`         varchar(64)  DEFAULT NULL COMMENT '访问设备',
@@ -744,7 +746,7 @@ CREATE TABLE `t_link_device_stats`
     `update_time`    datetime     DEFAULT NULL COMMENT '修改时间',
     `del_flag`       tinyint(1)   DEFAULT NULL COMMENT '删除标识 0：未删除 1：已删除',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `idx_unique_browser_stats` (`full_short_url`, `date`, `device`) USING BTREE
+    UNIQUE KEY `idx_unique_device_stats` (`full_short_url`, `gid`, `date`, `device`) USING BTREE
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
@@ -913,6 +915,7 @@ CREATE TABLE `t_link_locale_stats`
 (
     `id`             bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'ID',
     `full_short_url` varchar(128) DEFAULT NULL COMMENT '完整短链接',
+    `gid`            varchar(32)  DEFAULT NULL COMMENT '分组标识',
     `date`           date         DEFAULT NULL COMMENT '日期',
     `cnt`            int(11)      DEFAULT NULL COMMENT '访问量',
     `province`       varchar(64)  DEFAULT NULL COMMENT '省份名称',
@@ -923,7 +926,7 @@ CREATE TABLE `t_link_locale_stats`
     `update_time`    datetime     DEFAULT NULL COMMENT '修改时间',
     `del_flag`       tinyint(1)   DEFAULT NULL COMMENT '删除标识 0：未删除 1：已删除',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `idx_unique_locale_stats` (`full_short_url`, `date`, `adcode`, `province`) USING BTREE
+    UNIQUE KEY `idx_unique_locale_stats` (`full_short_url`, `gid`, `date`, `adcode`, `province`) USING BTREE
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
@@ -931,6 +934,7 @@ CREATE TABLE `t_link_network_stats`
 (
     `id`             bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'ID',
     `full_short_url` varchar(128) DEFAULT NULL COMMENT '完整短链接',
+    `gid`            varchar(32)  DEFAULT NULL COMMENT '分组标识',
     `date`           date         DEFAULT NULL COMMENT '日期',
     `cnt`            int(11)      DEFAULT NULL COMMENT '访问量',
     `network`        varchar(64)  DEFAULT NULL COMMENT '访问网络',
@@ -938,7 +942,7 @@ CREATE TABLE `t_link_network_stats`
     `update_time`    datetime     DEFAULT NULL COMMENT '修改时间',
     `del_flag`       tinyint(1)   DEFAULT NULL COMMENT '删除标识 0：未删除 1：已删除',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `idx_unique_browser_stats` (`full_short_url`, `date`, `network`) USING BTREE
+    UNIQUE KEY `idx_unique_network_stats` (`full_short_url`, `gid`, `date`, `network`) USING BTREE
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 

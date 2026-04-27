@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.xmon.shortlink.project.dao.entity.LinkOsStatsDO;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 /**
  * 操作系统访问统计持久层
@@ -23,4 +26,24 @@ public interface LinkOsStatsMapper extends BaseMapper<LinkOsStatsDO> {
                 update_time = NOW()
             """)
     void shortLinkOsStats(@Param("linkOsStats") LinkOsStatsDO linkOsStatsDO);
+
+    /**
+     * 查询 OS 维度统计（按日期范围聚合）
+     */
+    @Select("""
+            SELECT os, SUM(cnt) AS cnt
+            FROM t_link_os_stats
+            WHERE full_short_url = #{fullShortUrl}
+              AND gid = #{gid}
+              AND date >= #{startDate}
+              AND date <= #{endDate}
+              AND del_flag = 0
+            GROUP BY os
+            """)
+    List<LinkOsStatsDO> listStatsByLink(
+            @Param("fullShortUrl") String fullShortUrl,
+            @Param("gid") String gid,
+            @Param("startDate") String startDate,
+            @Param("endDate") String endDate
+    );
 }

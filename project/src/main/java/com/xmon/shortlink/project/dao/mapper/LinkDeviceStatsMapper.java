@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.xmon.shortlink.project.dao.entity.LinkDeviceStatsDO;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 /**
  * 接口：短链接设备统计持久层
@@ -18,4 +21,23 @@ public interface LinkDeviceStatsMapper extends BaseMapper<LinkDeviceStatsDO> {
             "ON DUPLICATE KEY UPDATE cnt = cnt +  #{linkDeviceStats.cnt};")
     void shortLinkDeviceState(@Param("linkDeviceStats") LinkDeviceStatsDO linkDeviceStatsDO);
 
+    /**
+     * 查询设备维度统计（按日期范围聚合）
+     */
+    @Select("""
+            SELECT device, SUM(cnt) AS cnt
+            FROM t_link_device_stats
+            WHERE full_short_url = #{fullShortUrl}
+              AND gid = #{gid}
+              AND date >= #{startDate}
+              AND date <= #{endDate}
+              AND del_flag = 0
+            GROUP BY device
+            """)
+    List<LinkDeviceStatsDO> listStatsByLink(
+            @Param("fullShortUrl") String fullShortUrl,
+            @Param("gid") String gid,
+            @Param("startDate") String startDate,
+            @Param("endDate") String endDate
+    );
 }

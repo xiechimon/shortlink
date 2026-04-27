@@ -16,6 +16,8 @@ import com.xmon.shortlink.admin.remote.dto.req.RecycleBinPageReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinRecoverReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinRemoveReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
+import com.xmon.shortlink.admin.remote.dto.req.ShortLinkStatsReqDTO;
+import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkStatsRespDTO;
 
 import java.util.HashMap;
 import java.util.List;
@@ -131,5 +133,18 @@ public interface ShortLinkRemoteService {
      */
     default void removeRecycleBin(RecycleBinRemoveReqDTO requestParam) {
         HttpUtil.post(SHORT_LINK_SERVICE_BASE_URL + "/recycle-bin/remove", JSON.toJSONString(requestParam));
+    }
+
+    /**
+     * 查询单个短链接监控统计
+     */
+    default Result<ShortLinkStatsRespDTO> oneShortLinkStats(ShortLinkStatsReqDTO requestParam) {
+        HashMap<String, Object> requestMap = new HashMap<>();
+        requestMap.put("fullShortUrl", requestParam.getFullShortUrl());
+        requestMap.put("gid", requestParam.getGid());
+        requestMap.put("startDate", requestParam.getStartDate());
+        requestMap.put("endDate", requestParam.getEndDate());
+        String resultStr = HttpUtil.get(SHORT_LINK_SERVICE_BASE_URL + "/stats", requestMap);
+        return JSON.parseObject(resultStr, new TypeReference<>() {});
     }
 }
