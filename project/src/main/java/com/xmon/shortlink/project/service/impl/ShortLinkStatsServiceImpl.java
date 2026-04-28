@@ -1,6 +1,11 @@
 package com.xmon.shortlink.project.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.xmon.shortlink.project.dao.entity.LinkAccessLogsDO;
 import com.xmon.shortlink.project.dao.entity.LinkAccessStatsDO;
 import com.xmon.shortlink.project.dao.entity.LinkBrowserStatsDO;
 import com.xmon.shortlink.project.dao.entity.LinkDeviceStatsDO;
@@ -14,7 +19,9 @@ import com.xmon.shortlink.project.dao.mapper.LinkDeviceStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkLocaleStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkNetworkStatsMapper;
 import com.xmon.shortlink.project.dao.mapper.LinkOsStatsMapper;
+import com.xmon.shortlink.project.dto.req.LinkAccessLogPageReqDTO;
 import com.xmon.shortlink.project.dto.req.ShortLinkStatsReqDTO;
+import com.xmon.shortlink.project.dto.resp.LinkAccessLogPageRespDTO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkStatsDailyRespVO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkStatsLocaleCNRespVO;
 import com.xmon.shortlink.project.dto.resp.ShortLinkStatsRespDTO;
@@ -218,5 +225,29 @@ public class ShortLinkStatsServiceImpl implements ShortLinkStatsService {
                 .localeStats(localeStats)
                 .uvTypeStats(uvTypeStats)
                 .build();
+    }
+
+    @Override
+    public IPage<LinkAccessLogPageRespDTO> pageAccessLog(LinkAccessLogPageReqDTO requestParam) {
+        String startDate = requestParam.getStartDate();
+        String endDate = requestParam.getEndDate();
+        LambdaQueryWrapper<LinkAccessLogsDO> queryWrapper = Wrappers.lambdaQuery(LinkAccessLogsDO.class)
+                .eq(LinkAccessLogsDO::getFullShortUrl, requestParam.getFullShortUrl())
+                .eq(LinkAccessLogsDO::getGid, requestParam.getGid())
+                .eq(LinkAccessLogsDO::getDelFlag, 0)
+                .apply(startDate != null && !startDate.isBlank(), "DATE(create_time) >= {0}", startDate)
+                .apply(endDate != null && !endDate.isBlank(), "DATE(create_time) <= {0}", endDate)
+                .orderByDesc(LinkAccessLogsDO::getCreateTime);
+
+        IPage<LinkAccessLogsDO> resultPage = linkAccessLogsMapper.selectPage(requestParam, queryWrapper);
+        Set<String> oldUsers = startDate != null && !startDate.isBlank()
+                ? new HashSet<>(linkAccessLogsMapper.listOldUsersByLink(
+                requestParam.getFullShortUrl(), requestParam.getGid(), startDate))
+                : new HashSet<>();
+        return resultPage.convert(each -> {
+            LinkAccessLogPageRespDTO result = BeanUtil.toBean(each, LinkAccessLogPageRespDTO.class);
+            result.setUvType(oldUsers.contains(each.getUser()) ? "oldUser" : "newUser");
+            return result;
+        });
     }
 }

@@ -16,7 +16,9 @@ import com.xmon.shortlink.admin.remote.dto.req.RecycleBinPageReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinRecoverReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinRemoveReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.RecycleBinSaveReqDTO;
+import com.xmon.shortlink.admin.remote.dto.req.LinkAccessLogPageReqDTO;
 import com.xmon.shortlink.admin.remote.dto.req.ShortLinkStatsReqDTO;
+import com.xmon.shortlink.admin.remote.dto.resp.LinkAccessLogPageRespDTO;
 import com.xmon.shortlink.admin.remote.dto.resp.ShortLinkStatsRespDTO;
 
 import java.util.HashMap;
@@ -145,6 +147,21 @@ public interface ShortLinkRemoteService {
         requestMap.put("startDate", requestParam.getStartDate());
         requestMap.put("endDate", requestParam.getEndDate());
         String resultStr = HttpUtil.get(SHORT_LINK_SERVICE_BASE_URL + "/stats", requestMap);
+        return JSON.parseObject(resultStr, new TypeReference<>() {});
+    }
+
+    /**
+     * 分页查询短链接访问日志
+     */
+    default Result<IPage<LinkAccessLogPageRespDTO>> pageAccessLog(LinkAccessLogPageReqDTO requestParam) {
+        HashMap<String, Object> requestMap = new HashMap<>();
+        requestMap.put("fullShortUrl", requestParam.getFullShortUrl());
+        requestMap.put("gid", requestParam.getGid());
+        requestMap.put("current", requestParam.getCurrent());
+        requestMap.put("size", requestParam.getSize());
+        requestMap.put("startDate", requestParam.getStartDate());
+        requestMap.put("endDate", requestParam.getEndDate());
+        String resultStr = HttpUtil.get(SHORT_LINK_SERVICE_BASE_URL + "/stats/access-record", requestMap);
         return JSON.parseObject(resultStr, new TypeReference<>() {});
     }
 }
