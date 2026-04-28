@@ -44,10 +44,7 @@ import com.xmon.shortlink.project.dto.resp.ShortLinkPageRespDTO;
 import com.xmon.shortlink.project.service.ShortLinkService;
 import com.xmon.shortlink.project.common.cache.ShortLinkCacheUtil;
 import com.xmon.shortlink.project.service.handler.LinkLocaleResolver;
-import com.xmon.shortlink.project.service.handler.LinkBrowserResolver;
-import com.xmon.shortlink.project.service.handler.LinkDeviceResolver;
-import com.xmon.shortlink.project.service.handler.LinkNetworkResolver;
-import com.xmon.shortlink.project.service.handler.LinkOsResolver;
+import com.xmon.shortlink.project.service.handler.LinkUserAgentResolver;
 import com.xmon.shortlink.project.service.handler.WebTitleFetcher;
 import com.xmon.shortlink.project.toolkit.ClientIpUtil;
 import com.xmon.shortlink.project.toolkit.HashUtil;
@@ -100,11 +97,8 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
     private final LinkOsStatsMapper linkOsStatsMapper;
     private final LinkDeviceStatsMapper linkDeviceStatsMapper;
     private final LinkNetworkStatsMapper linkNetworkStatsMapper;
-    private final LinkBrowserResolver linkBrowserResolver;
+    private final LinkUserAgentResolver linkUserAgentResolver;
     private final LinkLocaleResolver linkLocaleResolver;
-    private final LinkOsResolver linkOsResolver;
-    private final LinkDeviceResolver linkDeviceResolver;
-    private final LinkNetworkResolver linkNetworkResolver;
     @Value("${short-link.not-found-redirect-url:}")
     private String notFoundRedirectUrl;
 
@@ -478,10 +472,10 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper, ShortLink
                     int hour = DateUtil.hour(now, true);
                     int weekday = DateUtil.dayOfWeekEnum(now).getIso8601Value();
                     String today = DateUtil.formatDate(now);
-                    String browser = linkBrowserResolver.resolve(userAgent);
-                    String os = linkOsResolver.resolve(userAgent);
-                    String device = linkDeviceResolver.resolve(userAgent);
-                    String network = linkNetworkResolver.resolve(remoteAddr, userAgent);
+                    String browser = linkUserAgentResolver.resolveBrowser(userAgent);
+                    String os = linkUserAgentResolver.resolveOs(userAgent);
+                    String device = linkUserAgentResolver.resolveDevice(userAgent);
+                    String network = linkUserAgentResolver.resolveNetwork(remoteAddr, userAgent);
                     LinkLocaleStatsInfo localeStatsInfo = linkLocaleResolver.resolve(remoteAddr).orElse(null);
 
                     uvRedisKey = RedisCacheConstant.buildStatsUvKey(fullShortUrl, today);
